@@ -73,13 +73,22 @@ def projetar_dre_ams(
     df_fopm: pd.DataFrame,
     anos: Iterable[int] = (2026, 2027, 2028, 2029, 2030),
     bu: str = "AMS",
+    *,
+    taxa_conversao_fopm: float | None = None,
+    churn: float = 0.0,
 ) -> pd.DataFrame:
     """
     Projeta a DRE da BU AMS de 2026 a 2030 seguindo o plano de implementação AMS.
 
     A projeção depende do FB da FOPM já projetado para cada ano, recebido em `df_fopm`.
+
+    taxa_conversao_fopm: fração do FB FOPM que vira receita incremental AMS (default RATIO_INCREMENTAL_FOPM).
+    churn: perda anual da base recorrente (0–1). Aplica-se após reajuste da base retida e antes do incremental:
+    ``rec_gross = base_ant * fator_reajuste``; ``base_retida = rec_gross * (1 - churn)``;
+    ``FB = base_retida + incremental``; estado seguinte ``base_ant = rec_gross``.
     """
     anos_list = _validar_anos(anos)
+    ratio_inc = RATIO_INCREMENTAL_FOPM if taxa_conversao_fopm is None else taxa_conversao_fopm
 
     # Mapa ano → FB FOPM projetado
     fb_fopm_por_ano = (
@@ -101,7 +110,9 @@ def projetar_dre_ams(
     anos_rec_fin_hist = sorted(RECEITA_FIN_AMS_HIST.keys())
     rec_fin_series = [RECEITA_FIN_AMS_HIST[a] for a in anos_rec_fin_hist]
 
-    fb_ams_ant = FB_AMS_2025
+    # A base retida deve evoluir sobre ela mesma. Nao usar o FB total,
+    # para nao capitalizar o incremental FOPM no ciclo seguinte.
+    base_retida_ant = FB_AMS_2025
 
     for ano in anos_list:
         if ano not in fb_fopm_por_ano:
@@ -109,12 +120,13 @@ def projetar_dre_ams(
 
         inflacao = INFLACAO_FOCUS[ano]
 
-        # 1) Base Retida
+        # 1) Base retida (bruta pós-reajuste; churn reduz apenas a parcela recorrente do ano)
         fator_reajuste = (1.0 + inflacao) * (1.0 + 0.02)
-        base_retida = fb_ams_ant * fator_reajuste
+        rec_gross = base_retida_ant * fator_reajuste
+        base_retida = rec_gross * (1.0 - churn)
 
         # 2) Incremental FOPM
-        incremental = fb_fopm_por_ano[ano] * RATIO_INCREMENTAL_FOPM
+        incremental = fb_fopm_por_ano[ano] * ratio_inc
 
         # 3) Faturamento Bruto
         faturamento_bruto = base_retida + incremental
@@ -208,6 +220,9 @@ def projetar_dre_ams(
                 "ticket_medio": ticket_medio,
                 "custo_por_func": custo_por_func,
                 "base_retida": base_retida,
+                "rec_gross_pos_reajuste": rec_gross,
+                "taxa_conversao_fopm": ratio_inc,
+                "churn": churn,
                 "incremental_fopm": incremental,
                 "faturamento_bruto": faturamento_bruto,
                 "impostos_sv": impostos_sv,
@@ -235,8 +250,8 @@ def projetar_dre_ams(
             }
         )
 
-        # Atualiza bases para próxima iteração
-        fb_ams_ant = faturamento_bruto
+        # Próximo ano: ancora na base bruta reajustada (antes do churn), como no modelo sem churn.
+        base_retida_ant = rec_gross
         ticket_ant = ticket_medio
         custo_func_ant = custo_por_func
 
@@ -253,6 +268,9 @@ def projetar_dre_ams(
         "ticket_medio",
         "custo_por_func",
         "base_retida",
+        "rec_gross_pos_reajuste",
+        "taxa_conversao_fopm",
+        "churn",
         "incremental_fopm",
         "faturamento_bruto",
         "impostos_sv",

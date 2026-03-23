@@ -1,0 +1,27 @@
+.section {
+  margin-bottom: var(--spacing-6);
+}
+
+.title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-primary-900);
+  margin: 0 0 var(--spacing-4);
+}
+
+.tabContent {
+  display: grid;
+  gap: var(--spacing-4);
+}
+
+.chartsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-4);
+}
+
+@media (max-width: 1024px) {
+  .chartsGrid {
+    grid-template-columns: 1fr;
+  }
+}

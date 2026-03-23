@@ -1,0 +1,17 @@
+.container {
+  background-color: var(--color-bg-primary);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-4);
+}
+
+.title {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-primary-800);
+  margin: 0 0 var(--spacing-4);
+}
+
+.chart {
+  width: 100%;
+}

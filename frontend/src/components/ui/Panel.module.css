@@ -1,0 +1,60 @@
+.panel {
+  background-color: var(--color-bg-primary);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--spacing-4);
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-4) var(--spacing-5);
+  width: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color var(--transition-fast);
+}
+
+button.header:hover {
+  background-color: var(--color-bg-secondary);
+}
+
+.title {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-primary-800);
+  margin: 0;
+}
+
+.chevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-neutral-500);
+  transition: transform var(--transition-fast);
+  transform: rotate(-90deg);
+}
+
+.chevron.open {
+  transform: rotate(0deg);
+}
+
+.content {
+  padding: 0 var(--spacing-5) var(--spacing-5);
+  border-top: 1px solid var(--color-border-light);
+}
+
+/* When header is not a button */
+div.header {
+  cursor: default;
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+div.header + .content {
+  border-top: none;
+  padding-top: var(--spacing-4);
+}

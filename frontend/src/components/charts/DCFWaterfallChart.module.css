@@ -1,0 +1,31 @@
+.metaRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-3);
+  margin-bottom: var(--spacing-3);
+}
+
+.metaCard {
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-secondary);
+  padding: var(--spacing-2) var(--spacing-3);
+}
+
+.metaLabel {
+  display: block;
+  color: var(--color-neutral-600);
+  font-size: var(--font-size-xs);
+  margin-bottom: var(--spacing-1);
+}
+
+.metaValue {
+  font-size: var(--font-size-sm);
+  color: var(--color-primary-900);
+}
+
+@media (max-width: 640px) {
+  .metaRow {
+    grid-template-columns: 1fr;
+  }
+}

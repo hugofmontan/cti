@@ -1,0 +1,28 @@
+.layout {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-bg-secondary);
+}
+
+.main {
+  flex: 1;
+  padding: var(--spacing-6) var(--spacing-4);
+}
+
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+@media (max-width: 1024px) {
+  .main {
+    padding: var(--spacing-4) var(--spacing-3);
+  }
+}
+
+@media (max-width: 640px) {
+  .main {
+    padding: var(--spacing-3) var(--spacing-2);
+  }
+}

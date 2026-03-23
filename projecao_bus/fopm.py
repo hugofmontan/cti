@@ -204,6 +204,9 @@ def _validar_anos(anos: Iterable[int]) -> List[int]:
 def projetar_dre_fopm_brasil(
     anos: Iterable[int] = (2026, 2027, 2028, 2029, 2030),
     bu: str = "FOPM BRASIL",
+    *,
+    headcount_por_ano: dict[int, int] | None = None,
+    ociosidade_por_ano: dict[int, float] | None = None,
 ) -> pd.DataFrame:
     """
     Projeta a DRE FOPM Brasil de 2026 a 2030 seguindo o plano de implementação.
@@ -220,8 +223,16 @@ def projetar_dre_fopm_brasil(
 
     for ano in anos_list:
         inflacao = INFLACAO_FOCUS[ano]
-        n_funcionarios = HEADCOUNT_PLANEJADO[ano]
-        ociosidade = OCIOSIDADE[ano]
+        n_funcionarios = (
+            headcount_por_ano[ano]
+            if headcount_por_ano is not None and ano in headcount_por_ano
+            else HEADCOUNT_PLANEJADO[ano]
+        )
+        ociosidade = (
+            ociosidade_por_ano[ano]
+            if ociosidade_por_ano is not None and ano in ociosidade_por_ano
+            else OCIOSIDADE[ano]
+        )
 
         total_horas = n_funcionarios * 160.0 * 12.0
         horas_alocadas = total_horas * (1.0 - ociosidade)
@@ -343,8 +354,6 @@ def projetar_dre_fopm_brasil(
 
     df = df[colunas_ordenadas]
     return df
-
-
 
 
 def salvar_projecao_csv(
