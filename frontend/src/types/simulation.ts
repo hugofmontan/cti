@@ -29,13 +29,15 @@ export interface DRERow {
   lucro_liquido: number
   ebitda_pct_rl?: number
   lucro_liquido_pct_rl?: number
+  /** Headcount (média / premissa) — histórico via `historical-dre`, projeção via simulação. */
+  n_funcionarios?: number
   [key: string]: string | number | undefined
 }
 
 export interface FluxoRow {
   ano: number
   ebit: number
-  ir_csll_ams: number
+  ir_sobre_ebit: number
   nopat: number
   da_total: number
   capex: number

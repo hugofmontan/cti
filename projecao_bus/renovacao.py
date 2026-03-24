@@ -8,7 +8,7 @@ from typing import Iterable
 import numpy as np
 import pandas as pd
 
-from fopm import ALIQUOTA_ISV, INFLACAO_FOCUS, salvar_projecao_csv, _validar_anos
+from .shared import ALIQUOTA_ISV, INFLACAO_FOCUS, _validar_anos, salvar_projecao_csv
 
 FB_RENOVACAO_2025 = 3_385_238.39
 CUSTO_FUNC_RENOVACAO_2025 = 305_489.82 / 3.0
@@ -18,13 +18,6 @@ RATIO_REM_MC1_RENOVACAO = 0.065
 RATIO_OUTRAS_ADM_PCT_RL_RENOVACAO = (
     (20_175.45 / 1_712_222.97 + 20_606.90 / 1_991_988.59 + 16_131.42 / 2_777_019.53) / 3.0
 )
-RATEIO_ADM_RENOVACAO = {
-    2026: 145_525.0,
-    2027: 144_276.0,
-    2028: 144_050.0,
-    2029: 140_562.0,
-    2030: 139_458.0,
-}
 HONORARIOS_RENOVACAO_JANELA_INICIAL = [64_500.0, 66_000.0, 66_000.0]
 
 
@@ -73,13 +66,14 @@ def projetar_dre_renovacao(
         mc2 = mc1 - remuneracao_socios
         mc2_pct_rl = mc2 / receita_liquida if receita_liquida else math.nan
 
-        outras_desp_adm = receita_liquida * RATIO_OUTRAS_ADM_PCT_RL_RENOVACAO
-        rateio_adm = RATEIO_ADM_RENOVACAO[ano]
+        custo_proprio_adm = receita_liquida * RATIO_OUTRAS_ADM_PCT_RL_RENOVACAO
+        rateio_adm = 0.0
 
         honorarios_adm = float(np.mean(janela_hon))
         janela_hon = janela_hon[1:] + [honorarios_adm]
+        outras_desp_adm = custo_proprio_adm + rateio_adm + honorarios_adm
 
-        ebitda = mc2 - outras_desp_adm - rateio_adm - honorarios_adm
+        ebitda = mc2 - outras_desp_adm
         ebitda_pct_rl = ebitda / receita_liquida if receita_liquida else math.nan
 
         ebit = ebitda
@@ -109,6 +103,7 @@ def projetar_dre_renovacao(
                 "remuneracao_socios": remuneracao_socios,
                 "mc2": mc2,
                 "mc2_pct_rl": mc2_pct_rl,
+                "custo_proprio_adm": custo_proprio_adm,
                 "outras_desp_adm": outras_desp_adm,
                 "rateio_adm": rateio_adm,
                 "honorarios_adm": honorarios_adm,
@@ -146,6 +141,7 @@ def projetar_dre_renovacao(
         "remuneracao_socios",
         "mc2",
         "mc2_pct_rl",
+        "custo_proprio_adm",
         "outras_desp_adm",
         "rateio_adm",
         "honorarios_adm",

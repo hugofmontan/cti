@@ -7,7 +7,7 @@ from typing import Iterable
 
 import pandas as pd
 
-from fopm import ALIQUOTA_ISV, INFLACAO_FOCUS, _validar_anos, salvar_projecao_csv
+from .shared import ALIQUOTA_ISV, INFLACAO_FOCUS, _validar_anos, salvar_projecao_csv
 
 N_FUNCIONARIOS_DS = {
     2026: 5,
@@ -39,15 +39,6 @@ RATIO_INCENTIVOS_PCT_RL = 0.0285
 RATIO_OUTRAS_DIR_PCT_RL = 0.0338
 RATIO_REM_SOCIOS_PCT_MC1 = 0.1656
 RATIO_OUTRAS_ADM_PCT_RL = 0.1277
-
-RATEIO_ADM_DS = {
-    2026: 242_542.0,
-    2027: 384_737.0,
-    2028: 480_167.0,
-    2029: 702_809.0,
-    2030: 790_259.0,
-}
-
 
 def projetar_dre_data_science(
     anos: Iterable[int] = (2026, 2027, 2028, 2029, 2030),
@@ -104,11 +95,12 @@ def projetar_dre_data_science(
         mc2 = mc1 - remuneracao_socios
         mc2_pct_rl = mc2 / receita_liquida if receita_liquida else math.nan
 
-        outras_desp_adm = receita_liquida * RATIO_OUTRAS_ADM_PCT_RL
-        rateio_adm = RATEIO_ADM_DS[ano]
+        custo_proprio_adm = receita_liquida * RATIO_OUTRAS_ADM_PCT_RL
+        rateio_adm = 0.0
         honorarios_adm = 0.0
+        outras_desp_adm = custo_proprio_adm + rateio_adm + honorarios_adm
 
-        ebitda = mc2 - outras_desp_adm - rateio_adm - honorarios_adm
+        ebitda = mc2 - outras_desp_adm
         ebitda_pct_rl = ebitda / receita_liquida if receita_liquida else math.nan
 
         ebit = ebitda
@@ -138,6 +130,7 @@ def projetar_dre_data_science(
                 "remuneracao_socios": remuneracao_socios,
                 "mc2": mc2,
                 "mc2_pct_rl": mc2_pct_rl,
+                "custo_proprio_adm": custo_proprio_adm,
                 "outras_desp_adm": outras_desp_adm,
                 "rateio_adm": rateio_adm,
                 "honorarios_adm": honorarios_adm,
@@ -175,6 +168,7 @@ def projetar_dre_data_science(
         "remuneracao_socios",
         "mc2",
         "mc2_pct_rl",
+        "custo_proprio_adm",
         "outras_desp_adm",
         "rateio_adm",
         "honorarios_adm",

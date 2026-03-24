@@ -1,20 +1,11 @@
 import math
 from pathlib import Path
-from typing import Iterable, List, Optional, Union
+from typing import Iterable, Optional, Union
 
 import numpy as np
 import pandas as pd
 
-
-INFLACAO_FOCUS = {
-    2026: 0.0397,
-    2027: 0.0380,
-    2028: 0.0350,
-    2029: 0.0350,
-    2030: 0.0350,
-}
-
-ALIQUOTA_ISV = 0.1743
+from .shared import ALIQUOTA_ISV, INFLACAO_FOCUS, _validar_anos, salvar_projecao_csv
 
 HEADCOUNT_PLANEJADO = {
     2026: 46,
@@ -44,7 +35,7 @@ def _carregar_historico_csv(
     """
     if caminho_csv is None:
         base_dir = Path(__file__).resolve().parent.parent
-        caminho_csv = base_dir / "data" / "dre_fopm_historico.csv"
+        caminho_csv = base_dir / "data" / "historico" / "dre_fopm_historico.csv"
 
     df = pd.read_csv(caminho_csv)
     if "linha" not in df.columns:
@@ -182,25 +173,6 @@ HORAS_POR_NF = _DRIVERS["horas_por_nf"]
 TICKET_BASE_2026 = _DRIVERS["ticket_base_2026"]
 HONORARIOS_BASE = _DRIVERS["honorarios_base"]
 
-RATEIO_ADM_FIXO = {
-    2026: 2_231_383.0,
-    2027: 2_260_328.0,
-    2028: 2_304_801.0,
-    2029: 2_295_843.0,
-    2030: 2_370_778.0,
-}
-
-
-def _validar_anos(anos: Iterable[int]) -> List[int]:
-    anos_list = list(anos)
-    if not anos_list:
-        raise ValueError("Lista de anos não pode ser vazia.")
-    for ano in anos_list:
-        if ano not in INFLACAO_FOCUS:
-            raise ValueError(f"Ano {ano} não possui premissas cadastradas.")
-    return sorted(anos_list)
-
-
 def projetar_dre_fopm_brasil(
     anos: Iterable[int] = (2026, 2027, 2028, 2029, 2030),
     bu: str = "FOPM BRASIL",
@@ -263,12 +235,14 @@ def projetar_dre_fopm_brasil(
         mc2 = mc1 - remuneracao_socios
         mc2_pct_rl = mc2 / receita_liquida if receita_liquida else math.nan
 
-        outras_desp_adm = receita_liquida * RATIO_OUTRAS_ADM_PCT_RL
-        rateio_adm = RATEIO_ADM_FIXO[ano]
+        custo_proprio_adm = receita_liquida * RATIO_OUTRAS_ADM_PCT_RL
+        # Rateio ADM proporcional ao headcount — preenchido em `aplicar_rateio_projetado_nas_dres`.
+        rateio_adm = 0.0
 
         honorarios_adm = honorarios_ant * (1.0 + inflacao)
+        outras_desp_adm = custo_proprio_adm + rateio_adm + honorarios_adm
 
-        ebitda = mc2 - outras_desp_adm - rateio_adm - honorarios_adm
+        ebitda = mc2 - outras_desp_adm
         ebitda_pct_rl = ebitda / receita_liquida if receita_liquida else math.nan
 
         ebit = ebitda
@@ -300,6 +274,7 @@ def projetar_dre_fopm_brasil(
                 "remuneracao_socios": remuneracao_socios,
                 "mc2": mc2,
                 "mc2_pct_rl": mc2_pct_rl,
+                "custo_proprio_adm": custo_proprio_adm,
                 "outras_desp_adm": outras_desp_adm,
                 "rateio_adm": rateio_adm,
                 "honorarios_adm": honorarios_adm,
@@ -341,6 +316,7 @@ def projetar_dre_fopm_brasil(
         "remuneracao_socios",
         "mc2",
         "mc2_pct_rl",
+        "custo_proprio_adm",
         "outras_desp_adm",
         "rateio_adm",
         "honorarios_adm",
@@ -354,26 +330,6 @@ def projetar_dre_fopm_brasil(
 
     df = df[colunas_ordenadas]
     return df
-
-
-def salvar_projecao_csv(
-    df: pd.DataFrame,
-    base_dir: Path | None = None,
-    nome_arquivo: str = "projecao_fopm_brasil.csv",
-) -> Path:
-    """
-    Salva o DataFrame de projeção no caminho padrão `projecoes/projecao_fopm_brasil.csv`
-    abaixo do diretório base informado (por padrão, o diretório deste arquivo).
-    """
-    if base_dir is None:
-        base_dir = Path(__file__).resolve().parent
-
-    destino_dir = base_dir / "projecoes"
-    destino_dir.mkdir(parents=True, exist_ok=True)
-
-    destino_arquivo = destino_dir / nome_arquivo
-    df.to_csv(destino_arquivo, index=False)
-    return destino_arquivo
 
 
 def projetar_e_salvar(

@@ -14,6 +14,7 @@ from .consolidado import ANOS_PADRAO, projetar_dre_consolidado_de_dfs
 from .data_science import TOTAL_PROJETOS_DS, projetar_dre_data_science
 from .dcf.constants import G_PERPETUIDADE, WACC_FIXO
 from .dcf.pipeline import run_dcf_pipeline_from_frames
+from .rateio_administrativo import aplicar_rateio_projetado_nas_dres
 from .fopm import HEADCOUNT_PLANEJADO, OCIOSIDADE, projetar_dre_fopm_brasil
 from .renovacao import SPREAD_REAJUSTE_RENOVACAO, projetar_dre_renovacao
 from .venda_softwares import FATOR_CRESCIMENTO_REAL, projetar_dre_venda_softwares
@@ -127,6 +128,8 @@ def run_simulation(
         "data_science": df_ds,
     }
 
+    aplicar_rateio_projetado_nas_dres(dfs)
+
     df_cons = projetar_dre_consolidado_de_dfs(dfs, anos=ANOS)
 
     dcf_p = p["dcf"]
@@ -140,6 +143,7 @@ def run_simulation(
     dcf_bundle = run_dcf_pipeline_from_frames(
         df_cons,
         df_ams,
+        dfs_bu=dfs,
         wacc=wacc,
         g=g,
         base_dir=base_dir,

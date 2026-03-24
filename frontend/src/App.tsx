@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import styles from './App.module.css'
 import { DashboardLayout } from './components/layout'
 import {
@@ -22,10 +22,22 @@ import {
   ValuationSummary,
 } from './components/sections'
 import { Alert, Button, LoadingSpinner, Panel } from './components/ui'
-import { usePremissas, useSimulation } from './hooks'
+import { useHistoricalDRE, usePremissas, useSimulation } from './hooks'
+import { mergeConsolidadoSeries, mergeDreByBU } from './utils/dreMerge'
 
 export default function App() {
   const { premissas, setPremissas, result, loading, error, runSimulation } = useSimulation()
+  const { historical, loading: loadingHist, error: errorHist } = useHistoricalDRE()
+
+  const mergedConsolidado = useMemo(
+    () => mergeConsolidadoSeries(historical?.consolidado, result?.consolidado),
+    [historical?.consolidado, result?.consolidado],
+  )
+
+  const mergedDre = useMemo(
+    () => mergeDreByBU(historical?.dre, result?.dre),
+    [historical?.dre, result?.dre],
+  )
 
   const {
     setAmsChurn,
@@ -55,6 +67,12 @@ export default function App() {
       {error ? (
         <Alert variant="error" title="Falha de integração">
           {error}
+        </Alert>
+      ) : null}
+
+      {errorHist ? (
+        <Alert variant="warning" title="Histórico">
+          {errorHist} Exibindo apenas projeção.
         </Alert>
       ) : null}
 
@@ -98,23 +116,34 @@ export default function App() {
               {result ? (
                 <>
                   <ValuationSummary dcf={result.dcf} />
-                  <RevenueByBUChart dre={result.dre} />
-                  <MarginTrendChart consolidado={result.consolidado} />
+                  <RevenueByBUChart dre={result.dre} mergedDre={mergedDre} />
+                  <MarginTrendChart consolidado={mergedConsolidado} />
                   <DCFWaterfallChart dcf={result.dcf} />
                 </>
               ) : (
-                <Alert variant="info">Clique em recalcular para carregar os resultados.</Alert>
+                <>
+                  {!loadingHist && historical ? (
+                    <>
+                      <RevenueByBUChart dre={{}} mergedDre={mergedDre} />
+                      <MarginTrendChart consolidado={mergedConsolidado} />
+                    </>
+                  ) : null}
+                  <Alert variant="info">
+                    Clique em Recalcular para carregar DCF e a projeção 2026–2030. Os gráficos acima
+                    mostram o histórico de <code>data/original</code> quando disponível.
+                  </Alert>
+                </>
               )}
             </div>
           </div>
 
-          {result ? (
+          {historical || result ? (
             <>
-              <ConsolidatedDRE consolidado={result.consolidado} />
-              <CashFlowSection fluxo={result.fluxo} />
-              <MultiplesSection dcf={result.dcf} />
-              <BUBreakdown dre={result.dre} />
-              {result.warnings?.map((w) => (
+              <ConsolidatedDRE consolidado={mergedConsolidado} />
+              {result ? <CashFlowSection fluxo={result.fluxo} /> : null}
+              {result ? <MultiplesSection dcf={result.dcf} /> : null}
+              <BUBreakdown dre={mergedDre} />
+              {result?.warnings?.map((w) => (
                 <Alert key={w} variant="warning">
                   {w}
                 </Alert>

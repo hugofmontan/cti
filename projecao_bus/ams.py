@@ -4,7 +4,8 @@ from typing import Iterable
 import numpy as np
 import pandas as pd
 
-from fopm import INFLACAO_FOCUS, projetar_dre_fopm_brasil, salvar_projecao_csv
+from .fopm import projetar_dre_fopm_brasil
+from .shared import INFLACAO_FOCUS, _validar_anos, salvar_projecao_csv
 
 
 ALIQUOTA_ISV_AMS = 0.123  # 12,30%
@@ -32,15 +33,6 @@ RATIO_OUTRAS_DIR_PCT_RL_AMS = 0.01880
 RATIO_REM_SOCIOS_PCT_MC1_AMS = 0.11046
 RATIO_OUTRAS_ADM_PCT_RL_AMS = 0.01219
 
-# Rateio administrativo AMS - valores já calculados na planilha
-RATEIO_ADM_AMS = {
-    2026: 2_579_968.0,
-    2027: 2_609_915.0,
-    2028: 2_660_970.0,
-    2029: 2_649_267.0,
-    2030: 2_692_591.0,
-}
-
 # Honorários ADM Sócios Diretores históricos (para média móvel 4 anos)
 HONORARIOS_AMS_HIST = {
     2022: 240_000.0,
@@ -57,16 +49,6 @@ RECEITA_FIN_AMS_HIST = {
 }
 
 DESPESA_FIN_AMS_CONST = 56_667.0  # média 2023–2025
-
-
-def _validar_anos(anos: Iterable[int]) -> list[int]:
-    anos_list = list(anos)
-    if not anos_list:
-        raise ValueError("Lista de anos não pode ser vazia.")
-    for ano in anos_list:
-        if ano not in INFLACAO_FOCUS:
-            raise ValueError(f"Ano {ano} não possui premissas cadastradas.")
-    return sorted(anos_list)
 
 
 def projetar_dre_ams(
@@ -170,17 +152,18 @@ def projetar_dre_ams(
         mc2_pct_rl = mc2 / receita_liquida if receita_liquida else math.nan
 
         # 16) Outras Despesas Administrativas
-        outras_desp_adm = receita_liquida * RATIO_OUTRAS_ADM_PCT_RL_AMS
+        custo_proprio_adm = receita_liquida * RATIO_OUTRAS_ADM_PCT_RL_AMS
 
-        # 17) Rateio Administrativo
-        rateio_adm = RATEIO_ADM_AMS[ano]
+        # 17) Rateio Administrativo (pool ADM / headcount — ver `rateio_administrativo`)
+        rateio_adm = 0.0
 
         # 18) Honorários ADM Sócios Diretores (média móvel 4 anos)
         honorarios_adm = float(np.mean(honor_series[-4:]))
         honor_series.append(honorarios_adm)
+        outras_desp_adm = custo_proprio_adm + rateio_adm + honorarios_adm
 
         # 19) EBITDA
-        ebitda = mc2 - outras_desp_adm - rateio_adm - honorarios_adm
+        ebitda = mc2 - outras_desp_adm
         ebitda_pct_rl = ebitda / receita_liquida if receita_liquida else math.nan
 
         # 20) Depreciação / Amortização
@@ -235,6 +218,7 @@ def projetar_dre_ams(
                 "remuneracao_socios": remuneracao_socios,
                 "mc2": mc2,
                 "mc2_pct_rl": mc2_pct_rl,
+                "custo_proprio_adm": custo_proprio_adm,
                 "outras_desp_adm": outras_desp_adm,
                 "rateio_adm": rateio_adm,
                 "honorarios_adm": honorarios_adm,
@@ -283,6 +267,7 @@ def projetar_dre_ams(
         "remuneracao_socios",
         "mc2",
         "mc2_pct_rl",
+        "custo_proprio_adm",
         "outras_desp_adm",
         "rateio_adm",
         "honorarios_adm",

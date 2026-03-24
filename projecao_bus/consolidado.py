@@ -7,19 +7,11 @@ from typing import Iterable
 
 import pandas as pd
 
-from fopm import _validar_anos, salvar_projecao_csv
+from .shared import _validar_anos, salvar_projecao_csv
 
 CHAVES_BU_OPERACIONAIS = ("fopm", "renovacao", "ams", "venda_sw", "data_science")
 
 ANOS_PADRAO = (2026, 2027, 2028, 2029, 2030)
-
-AMORTIZACAO_CFP = {
-    2026: -189_520.0,
-    2027: -178_575.0,
-    2028: -170_519.0,
-    2029: -151_534.0,
-    2030: -139_244.0,
-}
 
 SELIC_FOCUS = {
     2026: 0.1213,
@@ -81,9 +73,36 @@ def _projetar_consolidado_core(
     dfs: dict[str, pd.DataFrame],
     anos_list: list[int],
 ) -> pd.DataFrame:
-    resultados: list[dict] = []
-    caixa_ant = CAIXA_BASE_2025
+    """
+    D&A consolidada = D&A total do BP (cascata CAPEX × 20% por safra).
 
+    Caixa e receita financeira seguem a cadeia do modelo (sem circularidade):
+    Rec.Fin(t) = SELIC(t)×0,95×Caixa(t−1); depois DRE (EBIT, LAIR, LL);
+    NOPAT = EBIT − IRPJ/CSLL_AMS (IR da DRE AMS, LAIR AMS × 34%); FCFF = NOPAT + D&A − CAPEX − ΔNCG;
+    Caixa(t) = Caixa(t−1) + FCFF(t) − Dividendos(t), Dividendos = 50%×LL.
+    Participações são apenas linha de DRE (não entram nesse saldo de caixa).
+    """
+    from .dcf.bp import montar_bp
+    from .dcf.constants import PAYOUT_DIVIDENDOS
+    from .dcf.ncgl import montar_ncgl
+    from .rateio_administrativo import total_func_operacional_de_dfs
+
+    # CFP linha 37 (Honorários ADM Sócios Diretores): média rolling de 3 anos
+    # sobre o consolidado, sem somar as BUs na projeção.
+    honorarios_cfp_hist: dict[int, float] = {
+        2022: 2_280_000.0,
+        2023: 2_451_000.0,
+        2024: 2_508_000.0,
+        2025: 2_508_000.0,
+    }
+    honorarios_cfp_por_ano: dict[int, float] = dict(honorarios_cfp_hist)
+    for ano in anos_list:
+        honorarios_cfp_por_ano[ano] = (
+            honorarios_cfp_por_ano[ano - 3] + honorarios_cfp_por_ano[ano - 2] + honorarios_cfp_por_ano[ano - 1]
+        ) / 3.0
+
+    # 1) Linhas operacionais + DataFrame de entrada do BP (mesmas colunas que `montar_bp` usa)
+    linhas_pre: list[dict[str, float | int]] = []
     for ano in anos_list:
         receita_bruta = sum(float(dfs[k].at[ano, "faturamento_bruto"]) for k in CHAVES_BU_OPERACIONAIS)
         deducoes = sum(float(dfs[k].at[ano, "impostos_sv"]) for k in CHAVES_BU_OPERACIONAIS)
@@ -95,27 +114,9 @@ def _projetar_consolidado_core(
         remuneracao_socios = sum(float(dfs[k].at[ano, "remuneracao_socios"]) for k in CHAVES_BU_OPERACIONAIS)
         mc2 = sum(float(dfs[k].at[ano, "mc2"]) for k in CHAVES_BU_OPERACIONAIS)
         outras_desp_adm = sum(float(dfs[k].at[ano, "outras_desp_adm"]) for k in CHAVES_BU_OPERACIONAIS)
-        honorarios_adm = sum(float(dfs[k].at[ano, "honorarios_adm"]) for k in CHAVES_BU_OPERACIONAIS)
+        honorarios_adm = float(honorarios_cfp_por_ano[ano])
         ebitda = sum(float(dfs[k].at[ano, "ebitda"]) for k in CHAVES_BU_OPERACIONAIS)
-
-        # Rateio cancela na consolidacao (transferencia interna).
-        rateio_adm = 0.0
-
-        da_ams = float(dfs["ams"].at[ano, "depreciacao_amort"])
-        da_consolidada = da_ams - abs(AMORTIZACAO_CFP[ano])
-        ebit = ebitda - da_consolidada
-
-        receita_financeira = caixa_ant * (SELIC_FOCUS[ano] * SPREAD_RENDIMENTO_CAIXA)
-        despesa_financeira = DESPESA_FINANCEIRA_FIXA
-        lair = ebit + receita_financeira - despesa_financeira
-
-        # IRPJ consolidado = IRPJ da AMS.
-        irpj_csll = float(dfs["ams"].at[ano, "irpj_csll"])
-        lucro_liquido = lair - irpj_csll
-        participacoes = lucro_liquido * RATIO_PARTICIPACOES
-        caixa = caixa_ant + lucro_liquido - participacoes
-
-        resultados.append(
+        linhas_pre.append(
             {
                 "ano": ano,
                 "receita_bruta": receita_bruta,
@@ -125,12 +126,74 @@ def _projetar_consolidado_core(
                 "gastos_pessoal": gastos_pessoal,
                 "outras_desp_diretas": outras_desp_diretas,
                 "mc1": mc1,
-                "mc1_pct_rl": mc1 / receita_liquida if receita_liquida else 0.0,
                 "remuneracao_socios": remuneracao_socios,
                 "mc2": mc2,
-                "mc2_pct_rl": mc2 / receita_liquida if receita_liquida else 0.0,
                 "outras_desp_adm": outras_desp_adm,
                 "honorarios_adm": honorarios_adm,
+                "ebitda": ebitda,
+            }
+        )
+
+    df_bp_in = pd.DataFrame(linhas_pre)
+    total_func = total_func_operacional_de_dfs(dfs, anos_list)
+    df_bp = montar_bp(df_bp_in, total_func, usar_custos_excl_gabarito=True)
+    da_por_ano = df_bp.set_index("ano")["da_total"].to_dict()
+    capex_por_ano = df_bp.set_index("ano")["capex"].to_dict()
+    df_ncgl = montar_ncgl(df_bp)
+    delta_ncg_por_ano = df_ncgl.set_index("ano")["delta_ncg"].to_dict()
+
+    resultados: list[dict] = []
+    caixa_ant = CAIXA_BASE_2025
+
+    for row in linhas_pre:
+        ano = int(row["ano"])
+        receita_liquida = float(row["receita_liquida"])
+        ebitda = float(row["ebitda"])
+
+        # CONS.FORMATO PARCEIRO linha 40:
+        # DA_CFP = (-BP!G93) - DRE_AMS!J45 = DA_nova_BP - DA_AMS
+        # Mantemos aqui a mesma convenção de sinal da planilha (valor pode ficar negativo).
+        da_nova_bp = float(da_por_ano[ano])
+        da_ams = float(dfs["ams"].at[ano, "depreciacao_amort"])
+        da_consolidada = da_nova_bp - da_ams
+        ebit = ebitda - da_consolidada
+
+        receita_financeira = caixa_ant * (SELIC_FOCUS[ano] * SPREAD_RENDIMENTO_CAIXA)
+        despesa_financeira = DESPESA_FINANCEIRA_FIXA
+        lair = ebit + receita_financeira - despesa_financeira
+
+        # IRPJ/CSLL por BU (somente AMS tem valor > 0 no modelo).
+        irpj_csll = sum(float(dfs[k].at[ano, "irpj_csll"]) for k in CHAVES_BU_OPERACIONAIS)
+        lucro_liquido = lair - irpj_csll
+        participacoes = lucro_liquido * RATIO_PARTICIPACOES
+
+        ir_csll_nopat = float(dfs["ams"].at[ano, "irpj_csll"])
+        nopat = ebit - ir_csll_nopat
+        capex = float(capex_por_ano[ano])
+        dncg = float(delta_ncg_por_ano[ano])
+        fcff = nopat + da_consolidada - capex - dncg
+        dividendos = lucro_liquido * PAYOUT_DIVIDENDOS
+        caixa = caixa_ant + fcff - dividendos
+
+        mc1 = float(row["mc1"])
+        mc2 = float(row["mc2"])
+
+        resultados.append(
+            {
+                "ano": ano,
+                "receita_bruta": float(row["receita_bruta"]),
+                "deducoes": float(row["deducoes"]),
+                "receita_liquida": receita_liquida,
+                "incentivos": float(row["incentivos"]),
+                "gastos_pessoal": float(row["gastos_pessoal"]),
+                "outras_desp_diretas": float(row["outras_desp_diretas"]),
+                "mc1": mc1,
+                "mc1_pct_rl": mc1 / receita_liquida if receita_liquida else 0.0,
+                "remuneracao_socios": float(row["remuneracao_socios"]),
+                "mc2": mc2,
+                "mc2_pct_rl": mc2 / receita_liquida if receita_liquida else 0.0,
+                "outras_desp_adm": float(row["outras_desp_adm"]),
+                "honorarios_adm": float(row["honorarios_adm"]),
                 "ebitda": ebitda,
                 "ebitda_pct_rl": ebitda / receita_liquida if receita_liquida else 0.0,
                 "da_consolidada": da_consolidada,

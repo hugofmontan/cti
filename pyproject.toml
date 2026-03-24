@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "artefato-calculadora"
+version = "0.1.0"
+description = "Projecoes financeiras (DRE) e valuation (DCF) por unidade de negocio."
+requires-python = ">=3.10"
+dependencies = [
+    "pandas",
+    "numpy",
+]
+
+[project.optional-dependencies]
+api = [
+    "fastapi",
+    "uvicorn[standard]",
+]
+dev = [
+    "pytest",
+    "ruff",
+    "httpx",
+]
+
+[tool.setuptools.packages.find]
+include = ["api*", "projecao_bus*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B"]

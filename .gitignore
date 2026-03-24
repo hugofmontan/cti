@@ -6,4 +6,8 @@ __pycache__/
 venv/
 .env
 *.env
+projecao_bus/projecoes/
+projecao_bus/dcf_output/
+frontend/dist/
+node_modules/
 

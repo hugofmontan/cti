@@ -43,6 +43,22 @@ def carregar_faturamentos_bu(base_dir: Path, anos: Iterable[int]) -> dict[int, d
     return out
 
 
+def faturamentos_bu_de_dfs(
+    dfs_bu: dict[str, pd.DataFrame],
+    anos: Iterable[int],
+) -> dict[int, dict[str, float]]:
+    """Faturamento bruto por BU e ano a partir de DataFrames em memória."""
+    out: dict[int, dict[str, float]] = {int(a): {} for a in anos}
+    for bu_key, df in dfs_bu.items():
+        if "ano" not in df.columns or "faturamento_bruto" not in df.columns:
+            continue
+        recorte = df[df["ano"].isin(list(anos))]
+        for _, row in recorte.iterrows():
+            ano = int(row["ano"])
+            out[ano][bu_key] = float(row["faturamento_bruto"])
+    return out
+
+
 def beta_ponderado_por_ano(
     faturamentos_por_ano: dict[int, dict[str, float]],
     betas: dict[str, float] | None = None,

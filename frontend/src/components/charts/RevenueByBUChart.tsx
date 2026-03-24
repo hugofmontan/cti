@@ -3,6 +3,7 @@ import {
   AreaChart,
   CartesianGrid,
   Legend,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -10,22 +11,35 @@ import {
 } from 'recharts'
 import type { DRERow } from '../../types'
 import { fmtBRL, fmtMillions } from '../../utils/formatters'
-import { transformRevenueByBUData } from '../../utils/chartHelpers'
-import { BU_NAMES, CHART_COLORS } from '../../utils/constants'
+import { transformRevenueByBUData, transformRevenueByBUDataMerged } from '../../utils/chartHelpers'
+import { BU_NAMES, CHART_COLORS, HISTORICAL_YEAR_END } from '../../utils/constants'
+import type { DRERowMerged } from '../../utils/dreMerge'
 import { ChartContainer } from './ChartContainer'
 
 interface RevenueByBUChartProps {
   dre: Record<string, DRERow[]>
+  /** Quando informado, usa série completa (histórico + projeção). */
+  mergedDre?: Record<string, DRERowMerged[]> | null
 }
 
-export function RevenueByBUChart({ dre }: RevenueByBUChartProps) {
-  const data = transformRevenueByBUData(dre)
+export function RevenueByBUChart({ dre, mergedDre }: RevenueByBUChartProps) {
+  const data =
+    mergedDre && Object.keys(mergedDre).length > 0
+      ? transformRevenueByBUDataMerged(mergedDre)
+      : transformRevenueByBUData(dre)
 
   return (
     <ChartContainer title="Receita Liquida por BU (Empilhado)" height={350}>
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={data} margin={{ top: 10, right: 30, left: 10, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-light)" />
+          {mergedDre ? (
+            <ReferenceLine
+              x={String(HISTORICAL_YEAR_END)}
+              stroke="var(--color-neutral-400)"
+              strokeDasharray="4 4"
+            />
+          ) : null}
           <XAxis
             dataKey="ano"
             tick={{ fontSize: 12, fill: 'var(--color-neutral-600)' }}
@@ -56,9 +70,23 @@ export function RevenueByBUChart({ dre }: RevenueByBUChartProps) {
             wrapperStyle={{ fontSize: '12px' }}
           />
           <Area type="monotone" dataKey="fopm" stackId="1" fill={CHART_COLORS.fopm} stroke={CHART_COLORS.fopm} name="fopm" />
-          <Area type="monotone" dataKey="renovacao" stackId="1" fill={CHART_COLORS.renovacao} stroke={CHART_COLORS.renovacao} name="renovacao" />
+          <Area
+            type="monotone"
+            dataKey="renovacao"
+            stackId="1"
+            fill={CHART_COLORS.renovacao}
+            stroke={CHART_COLORS.renovacao}
+            name="renovacao"
+          />
           <Area type="monotone" dataKey="ams" stackId="1" fill={CHART_COLORS.ams} stroke={CHART_COLORS.ams} name="ams" />
-          <Area type="monotone" dataKey="venda_sw" stackId="1" fill={CHART_COLORS.venda_sw} stroke={CHART_COLORS.venda_sw} name="venda_sw" />
+          <Area
+            type="monotone"
+            dataKey="venda_sw"
+            stackId="1"
+            fill={CHART_COLORS.venda_sw}
+            stroke={CHART_COLORS.venda_sw}
+            name="venda_sw"
+          />
           <Area
             type="monotone"
             dataKey="data_science"

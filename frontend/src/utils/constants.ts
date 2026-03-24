@@ -2,6 +2,30 @@ import type { YearKey } from '../types'
 
 export const YEARS: YearKey[] = ['2026', '2027', '2028', '2029', '2030']
 
+/** Anos com dados históricos em `data/original` (exibição + gráficos). */
+export const HISTORICAL_YEARS = [
+  '2018',
+  '2019',
+  '2020',
+  '2021',
+  '2022',
+  '2023',
+  '2024',
+  '2025',
+] as const
+
+/** Último ano histórico; a partir do seguinte usa projeção da simulação. */
+export const HISTORICAL_YEAR_END = 2025
+
+/** Série completa: histórico + projeção (tabelas e eixos X). */
+export const ALL_DISPLAY_YEARS = [...HISTORICAL_YEARS, ...YEARS] as const
+
+export type DisplayYearKey = (typeof ALL_DISPLAY_YEARS)[number]
+
+/** Cores: histórico vs projeção (gráficos e legenda). */
+export const SERIE_HISTORICAL_COLOR = '#1e40af'
+export const SERIE_PROJECTED_COLOR = '#059669'
+
 export const BU_NAMES = {
   fopm: 'FOPM',
   renovacao: 'Renovacao',

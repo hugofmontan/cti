@@ -15,7 +15,7 @@ type TableRow = {
 
 const FLUXO_LINES = [
   { key: 'ebit', label: 'EBIT' },
-  { key: 'ir_csll_ams', label: '(-) IR AMS' },
+  { key: 'ir_sobre_ebit', label: '(-) IR/CSLL (AMS — base LAIR)' },
   { key: 'nopat', label: 'NOPAT' },
   { key: 'da_total', label: '(+) D&A' },
   { key: 'delta_ncg', label: '(-) Delta NCG' },

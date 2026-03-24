@@ -7,7 +7,7 @@ from typing import Iterable
 
 import pandas as pd
 
-from fopm import ALIQUOTA_ISV, INFLACAO_FOCUS, _validar_anos, salvar_projecao_csv
+from .shared import ALIQUOTA_ISV, INFLACAO_FOCUS, _validar_anos, salvar_projecao_csv
 
 # Premissas fixas validadas no plano de implementacao.
 FB_VENDA_SOFTWARES_2025 = 7_722_610.43
@@ -19,13 +19,6 @@ RATIO_INCENTIVOS_PCT_RL = (
     / 3.0
 )
 RATIO_OUTRAS_DIR_PCT_RL = 1_172_937.78 / 6_353_758.49
-RATEIO_ADM_FIXO = {
-    2026: 48_508.0,
-    2027: 48_092.0,
-    2028: 48_017.0,
-    2029: 46_854.0,
-    2030: 46_486.0,
-}
 HONORARIOS_ADM_FIXO = (322_500.0 + 330_000.0 + 330_000.0) / 3.0
 
 
@@ -68,11 +61,12 @@ def projetar_dre_venda_softwares(
         mc2 = mc1
         mc2_pct_rl = mc1_pct_rl
 
-        outras_desp_adm = 0.0
-        rateio_adm = RATEIO_ADM_FIXO[ano]
+        custo_proprio_adm = 0.0
+        rateio_adm = 0.0
         honorarios_adm = HONORARIOS_ADM_FIXO
+        outras_desp_adm = custo_proprio_adm + rateio_adm + honorarios_adm
 
-        ebitda = mc2 - outras_desp_adm - rateio_adm - honorarios_adm
+        ebitda = mc2 - outras_desp_adm
         ebitda_pct_rl = ebitda / receita_liquida if receita_liquida else math.nan
 
         ebit = ebitda
@@ -99,6 +93,7 @@ def projetar_dre_venda_softwares(
                 "remuneracao_socios": remuneracao_socios,
                 "mc2": mc2,
                 "mc2_pct_rl": mc2_pct_rl,
+                "custo_proprio_adm": custo_proprio_adm,
                 "outras_desp_adm": outras_desp_adm,
                 "rateio_adm": rateio_adm,
                 "honorarios_adm": honorarios_adm,
@@ -133,6 +128,7 @@ def projetar_dre_venda_softwares(
         "remuneracao_socios",
         "mc2",
         "mc2_pct_rl",
+        "custo_proprio_adm",
         "outras_desp_adm",
         "rateio_adm",
         "honorarios_adm",

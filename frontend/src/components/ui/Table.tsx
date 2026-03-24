@@ -7,6 +7,10 @@ interface Column<T> {
   header: string
   align?: 'left' | 'right' | 'center'
   width?: string
+  /** Classe CSS no <th> desta coluna */
+  headerClassName?: string
+  /** Classe CSS em cada <td> desta coluna */
+  cellClassName?: string
   render?: (row: T, index: number) => ReactNode
 }
 
@@ -42,6 +46,7 @@ export function Table<T extends Record<string, unknown>>({
             {columns.map((col) => (
               <th
                 key={String(col.key)}
+                className={col.headerClassName}
                 style={{
                   textAlign: col.align || 'right',
                   width: col.width
@@ -61,6 +66,7 @@ export function Table<T extends Record<string, unknown>>({
               {columns.map((col) => (
                 <td
                   key={String(col.key)}
+                  className={col.cellClassName}
                   style={{ textAlign: col.align || 'right' }}
                 >
                   {col.render

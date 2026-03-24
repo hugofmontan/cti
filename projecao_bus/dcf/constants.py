@@ -18,7 +18,9 @@ PARTES_RELACIONADAS = 0.0
 OUTRAS_OBRIGACOES = -114_600.0
 RECEITAS_DIFERIDAS = 217_600.0
 
-CAPEX_POR_FUNC_NOVO = 15_595.50
+# CAPEX de expansão: R$ 15.000 / funcionário novo (base nominal).
+# O reajuste ano a ano é ∏(1 + inflação Focus[j], j=2026..ano) — ver `dcf/bp.py`.
+CAPEX_BASE_POR_FUNC_NOVO = 15_000.0
 TAXA_DEPRECIACAO_CAPEX = 0.20
 ANOS_DEPRECIACAO_CAPEX = 5
 

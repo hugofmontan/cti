@@ -9,11 +9,14 @@ from typing import Iterable
 
 import pandas as pd
 
+from ..administrativa import TOTAL_FUNC_OPERACIONAL_REF
+
 from .constants import (
     ADIANTAMENTOS,
     ANOS_DEPRECIACAO_CAPEX,
     ANOS_PROJECAO,
-    CAPEX_POR_FUNC_NOVO,
+    CAPEX_BASE_POR_FUNC_NOVO,
+    FUNC_NOVOS_2026_GABARITO,
     CUSTOS_EXCL_PESSOAL_GABARITO,
     DEPR_ACUM_BASE_2025,
     DIAS_ANO,
@@ -33,6 +36,19 @@ from .constants import (
 )
 
 
+def total_func_operacional_com_2025() -> dict[int, float]:
+    """
+    Headcount operacional por ano (inclui 2025 para cálculo de funcionários novos em 2026).
+    Mesma série usada no BP / DCF.
+    """
+    ref = TOTAL_FUNC_OPERACIONAL_REF
+    base_2025 = ref[2026] - FUNC_NOVOS_2026_GABARITO
+    out: dict[int, float] = {2025: base_2025}
+    for y in ANOS_PROJECAO:
+        out[y] = ref[y]
+    return out
+
+
 def _func_novos(total_func: dict[int, float], anos: Iterable[int]) -> dict[int, float]:
     out: dict[int, float] = {}
     anos_l = sorted(anos)
@@ -45,8 +61,26 @@ def _func_novos(total_func: dict[int, float], anos: Iterable[int]) -> dict[int, 
     return out
 
 
+def _capex_unitario_reajustado_por_ano() -> dict[int, float]:
+    """
+    Custo por funcionário novo no ano t:
+    CAPEX_base × ∏(1 + inflação_Focus[j], j=2026..t).
+
+    Base = R$ 15.000 (CAPEX_BASE_POR_FUNC_NOVO); inflação alinhada a `shared.INFLACAO_FOCUS`.
+    """
+    from ..shared import INFLACAO_FOCUS
+
+    prod = 1.0
+    out: dict[int, float] = {}
+    for ano in ANOS_PROJECAO:
+        prod *= 1.0 + INFLACAO_FOCUS[ano]
+        out[ano] = CAPEX_BASE_POR_FUNC_NOVO * prod
+    return out
+
+
 def _capex_por_ano(func_novos: dict[int, float]) -> dict[int, float]:
-    return {a: func_novos[a] * CAPEX_POR_FUNC_NOVO for a in func_novos}
+    units = _capex_unitario_reajustado_por_ano()
+    return {a: func_novos[a] * units[a] for a in func_novos}
 
 
 def _da_total_por_ano(capex_por_ano: dict[int, float]) -> dict[int, float]:
@@ -85,7 +119,10 @@ def montar_bp(
         rb = float(row["receita_bruta"])
         impostos_sv = float(row["deducoes"])
         gp_bu = float(row["gastos_pessoal"])
-        pessoal_nao = PESSOAL_NAO_ALOCADO_ADM[ano]
+        if "gastos_pessoal_nao_alocado" in row.index:
+            pessoal_nao = float(row["gastos_pessoal_nao_alocado"])
+        else:
+            pessoal_nao = PESSOAL_NAO_ALOCADO_ADM[ano]
         custo_total_pessoal = gp_bu + pessoal_nao
 
         if usar_custos_excl_gabarito:

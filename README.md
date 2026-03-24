@@ -1,39 +1,91 @@
-## Artefato FOPM — Projeção de DRE
+# Artefato Calculadora
 
-Este repositório contém o motor de projeção da DRE da BU **FOPM Brasil** (2026–2030), além dos dados históricos e saídas em CSV.
+Ferramenta de projeção financeira (DRE) e valuation (DCF) para múltiplas unidades
+de negócio, com backend Python/FastAPI e frontend React/TypeScript.
 
-### Estrutura de pastas
+## Arquitetura (visão textual)
 
-- `projecao_bus/` — código-fonte do motor de projeção (`fopm.py`) e CSVs de projeção gerados.
-  - `fopm.py` — implementa a projeção linha a linha conforme o documento de plano.
-  - `projecoes/` — arquivos de saída gerados pelo código (ex.: `projecao_fopm_brasil.csv`).
-- `data/` — arquivos CSV de **dados históricos** e **derivações** não geradas automaticamente pelo código.
-  - `dre_fopm_historico.csv` — histórico DRE 2018–2025 usado como base para cálculo dos drivers.
-  - `dre_fopm_projecao.csv` — DRE projetada em formato pivotado (linhas = contas, colunas = anos), derivada da projeção.
-- `docs/` — documentação e especificações funcionais.
-  - `planfopm.md` — plano detalhado de implementação do motor de projeção.
+- `frontend`: interface de simulação e visualização de resultados.
+- `api`: endpoints HTTP para defaults e simulação consolidada.
+- `projecao_bus`: motor de projeções por BU, consolidação e pipeline de DCF.
+- `data/historico`: bases históricas usadas como entrada dos cálculos.
+- `data/original`: arquivos originais de referência.
 
-### Fluxo principal
+Fluxo principal:
+`premissas` -> `projeções por BU` -> `consolidado` -> `DCF` -> `resposta JSON`.
 
-1. Ler o histórico DRE 2018–2025 de `data/dre_fopm_historico.csv`.
-2. Calcular os drivers médios (ratios e bases) com base em 2023–2025.
-3. Projetar a DRE da FOPM Brasil de 2026 a 2030 com as premissas de inflação, headcount e ociosidade.
-4. Salvar a projeção granular em `projecao_bus/projecoes/projecao_fopm_brasil.csv`.
-5. (Opcional) Derivar e atualizar a visão em formato de DRE (`data/dre_fopm_projecao.csv`) a partir da projeção granular.
+## Documentação detalhada
 
-### Como rodar a projeção
+- **[Funcionamento do projeto (aprofundado)](docs/FUNCIONAMENTO_PROJETO.md)** — arquitetura, BUs, consolidado, DCF, API, frontend e dados.
 
-Requisitos:
-
-- Python 3.10+ (recomendado)
-- Dependências: `pandas`, `numpy`
-
-Exemplo rápido de uso:
+## Quick Start
 
 ```bash
-cd artefato_calculadora
-python -m projecao_bus.fopm
+make install
+make dev
 ```
 
-Após a execução, o arquivo `projecao_bus/projecoes/projecao_fopm_brasil.csv` será atualizado com a projeção mais recente.
+No modo desenvolvimento:
+- API: `uvicorn api.app:app --reload --host 127.0.0.1 --port 8000`
+- Frontend: `cd frontend && npm run dev`
+
+## Estrutura de diretórios
+
+```text
+artefato_calculadora/
+├── api/
+│   ├── app.py
+│   ├── schemas.py
+│   └── routes/
+│       └── simulation.py
+├── data/
+│   ├── historico/
+│   └── original/
+├── frontend/
+├── projecao_bus/
+│   ├── shared.py
+│   ├── orchestrator.py
+│   ├── fopm.py
+│   ├── ams.py
+│   ├── renovacao.py
+│   ├── venda_softwares.py
+│   ├── data_science.py
+│   ├── administrativa.py
+│   └── consolidado.py
+└── tests/
+```
+
+## Endpoints da API
+
+- `GET /api/health`: status da API.
+- `GET /api/defaults`: premissas padrão da simulação.
+- `GET /api/historical-dre`: séries 2018–2025 a partir de `data/original/*.csv` (uso no dashboard).
+- `POST /api/simulate`: executa projeções + consolidado + DCF.
+
+Exemplo de payload:
+
+```json
+{
+  "premissas": {
+    "renovacao": { "churn": 0.05 },
+    "ams": { "taxa_conversao_fopm": 0.1 }
+  }
+}
+```
+
+## Módulos de BU
+
+- `fopm`: base operacional principal.
+- `renovacao`: receita recorrente com reajuste e churn opcional.
+- `ams`: dependente de FOPM para incremental.
+- `venda_softwares`: crescimento nominal por inflação + fator real.
+- `data_science`: projeção por número de projetos/capacidade.
+- `administrativa`: centro de custo para rateio interno.
+- `consolidado`: soma operacional e linhas financeiras do grupo.
+
+## Como contribuir
+
+- Rodar testes: `make test`
+- Rodar lint: `make lint`
+- Validar projeções: `python -m projecao_bus.orchestrator`
 

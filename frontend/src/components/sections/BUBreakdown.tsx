@@ -1,4 +1,18 @@
-import type { DRERow } from '../../types'
+import {
+  ALL_DISPLAY_YEARS,
+  BU_KEYS,
+  BU_NAMES,
+  DRE_DISPLAY_ORDER,
+  DRE_LINE_LABELS,
+  HISTORICAL_YEAR_END,
+} from '../../utils/constants'
+import type { DRERowMerged } from '../../utils/dreMerge'
+import { fmtBRL, fmtMillions, fmtPct } from '../../utils/formatters'
+import { Tabs } from '../ui/Tabs'
+import { Table } from '../ui/Table'
+import tableStyles from '../ui/Table.module.css'
+import { ChartContainer } from '../charts/ChartContainer'
+import styles from './BUBreakdown.module.css'
 import {
   Bar,
   CartesianGrid,
@@ -6,20 +20,16 @@ import {
   LabelList,
   Legend,
   Line,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts'
-import { BU_KEYS, BU_NAMES, DRE_DISPLAY_ORDER, DRE_LINE_LABELS, YEARS } from '../../utils/constants'
-import { fmtBRL, fmtMillions, fmtPct } from '../../utils/formatters'
-import { Tabs } from '../ui/Tabs'
-import { Table } from '../ui/Table'
-import { ChartContainer } from '../charts/ChartContainer'
-import styles from './BUBreakdown.module.css'
 
 interface BUBreakdownProps {
-  dre: Record<string, DRERow[]>
+  /** Série mesclada histórico + projeção por BU. */
+  dre: Record<string, DRERowMerged[]>
 }
 
 type TableRow = {
@@ -33,13 +43,14 @@ interface BuOperationalPoint {
   n_funcionarios: number
   ebitda: number
   margem_ebitda_pct: number
+  /** Para estilizar barras (opcional futuro) */
+  isHistorical: boolean
 }
 
-function getDreValue(row: DRERow, key: string): number | undefined {
-  const direct = row[key as keyof DRERow]
+function getDreValue(row: DRERowMerged, key: string): number | undefined {
+  const direct = row[key as keyof DRERowMerged]
   if (typeof direct === 'number') return direct
 
-  // Payload das BUs usa chaves diferentes do consolidado.
   if (key === 'receita_bruta') {
     const v = row.faturamento_bruto
     return typeof v === 'number' ? v : undefined
@@ -55,21 +66,25 @@ function getDreValue(row: DRERow, key: string): number | undefined {
 export function BUBreakdown({ dre }: BUBreakdownProps) {
   const tabs = BU_KEYS.map((buKey) => {
     const rows = dre[buKey] ?? []
-    const chartData: BuOperationalPoint[] = rows.map((r) => {
+
+    const chartData: BuOperationalPoint[] = ALL_DISPLAY_YEARS.map((ys) => {
+      const y = Number(ys)
+      const r = rows.find((row) => row.ano === y)
       const faturamentoBruto =
-        typeof r.faturamento_bruto === 'number'
+        typeof r?.faturamento_bruto === 'number'
           ? r.faturamento_bruto
-          : typeof r.receita_bruta === 'number'
+          : typeof r?.receita_bruta === 'number'
             ? r.receita_bruta
             : 0
-      const ebitda = typeof r.ebitda === 'number' ? r.ebitda : 0
-      const receitaLiquida = typeof r.receita_liquida === 'number' ? r.receita_liquida : 0
+      const ebitda = typeof r?.ebitda === 'number' ? r.ebitda : 0
+      const receitaLiquida = typeof r?.receita_liquida === 'number' ? r.receita_liquida : 0
       return {
-        ano: String(r.ano),
+        ano: ys,
         faturamento_bruto: faturamentoBruto,
-        n_funcionarios: typeof r.n_funcionarios === 'number' ? r.n_funcionarios : 0,
+        n_funcionarios: typeof r?.n_funcionarios === 'number' ? r.n_funcionarios : 0,
         ebitda,
         margem_ebitda_pct: receitaLiquida ? ebitda / receitaLiquida : 0,
+        isHistorical: y <= HISTORICAL_YEAR_END,
       }
     })
 
@@ -78,14 +93,24 @@ export function BUBreakdown({ dre }: BUBreakdownProps) {
       for (const yearData of rows) {
         const year = String(yearData.ano)
         const value = getDreValue(yearData, key)
-        row[year] = typeof value === 'number' ? fmtBRL(value) : '-'
+        row[year] = typeof value === 'number' ? fmtBRL(value) : '—'
       }
       return row
     })
 
     const columns = [
       { key: 'linha', header: 'Linha', align: 'left' as const, width: '220px' },
-      ...YEARS.map((year) => ({ key: year, header: year, align: 'right' as const })),
+      ...ALL_DISPLAY_YEARS.map((year) => {
+        const y = Number(year)
+        const isHist = y <= HISTORICAL_YEAR_END
+        return {
+          key: year,
+          header: year,
+          align: 'right' as const,
+          headerClassName: isHist ? tableStyles.colHistoricalHeader : tableStyles.colProjectedHeader,
+          cellClassName: isHist ? tableStyles.colHistorical : tableStyles.colProjected,
+        }
+      }),
     ]
 
     return {
@@ -93,6 +118,11 @@ export function BUBreakdown({ dre }: BUBreakdownProps) {
       label: BU_NAMES[buKey],
       content: (
         <div className={styles.tabContent}>
+          <p className={styles.tableLegend}>
+            <span className={styles.swatchHist} /> Histórico
+            <span className={styles.swatchGap} />
+            <span className={styles.swatchProj} /> Projeção
+          </p>
           <Table columns={columns} data={tableData} striped compact />
 
           <div className={styles.chartsGrid}>
@@ -103,6 +133,11 @@ export function BUBreakdown({ dre }: BUBreakdownProps) {
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-light)" />
+                  <ReferenceLine
+                    x={String(HISTORICAL_YEAR_END)}
+                    stroke="var(--color-neutral-400)"
+                    strokeDasharray="4 4"
+                  />
                   <XAxis dataKey="ano" />
                   <YAxis yAxisId="valor" tickFormatter={(v) => fmtMillions(v)} />
                   <YAxis yAxisId="func" orientation="right" />
@@ -147,9 +182,18 @@ export function BUBreakdown({ dre }: BUBreakdownProps) {
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-light)" />
+                  <ReferenceLine
+                    x={String(HISTORICAL_YEAR_END)}
+                    stroke="var(--color-neutral-400)"
+                    strokeDasharray="4 4"
+                  />
                   <XAxis dataKey="ano" />
                   <YAxis yAxisId="valor" tickFormatter={(v) => fmtMillions(v)} />
-                  <YAxis yAxisId="pct" orientation="right" tickFormatter={(v) => `${Math.round(v * 100)}%`} />
+                  <YAxis
+                    yAxisId="pct"
+                    orientation="right"
+                    tickFormatter={(v) => `${Math.round(v * 100)}%`}
+                  />
                   <Tooltip
                     formatter={(value, name) => {
                       if (name === 'margem_ebitda_pct') return [fmtPct(Number(value)), 'Margem EBITDA']

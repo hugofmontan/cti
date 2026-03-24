@@ -6,7 +6,13 @@ from typing import Iterable
 
 import pandas as pd
 
-from fopm import INFLACAO_FOCUS, _validar_anos, salvar_projecao_csv
+from .rateio_administrativo import (
+    ANOS_RATEIO_PROJECAO,
+    distribuir_rateio_por_headcount,
+    load_headcount_funcionarios_bu_csv,
+    serie_rateio_pool_negativo,
+)
+from .shared import INFLACAO_FOCUS, _validar_anos, salvar_projecao_csv
 
 # Drivers fixos conforme plano_implementacao_administrativa.md
 RATIO_OUTRAS_ADM_PCT_RL_CONSOLIDADA = 0.12415802928103117
@@ -25,21 +31,27 @@ RL_CONSOLIDADA_REF = {
     2030: 67_191_035.0,
 }
 
-TOTAL_FUNC_OPERACIONAL_REF = {
-    2026: 108.186,
-    2027: 113.269,
-    2028: 117.418,
-    2029: 124.543,
-    2030: 129.923,
-}
 
-RATEIO_POR_BU_FIXO = {
-    "fopm": {2026: 2_231_383.0, 2027: 2_260_328.0, 2028: 2_304_801.0, 2029: 2_295_843.0, 2030: 2_370_778.0},
-    "renovacao": {2026: 145_525.0, 2027: 144_276.0, 2028: 144_050.0, 2029: 140_562.0, 2030: 139_458.0},
-    "ams": {2026: 2_579_968.0, 2027: 2_609_915.0, 2028: 2_660_970.0, 2029: 2_649_267.0, 2030: 2_692_591.0},
-    "venda_sw": {2026: 48_508.0, 2027: 48_092.0, 2028: 48_017.0, 2029: 46_854.0, 2030: 46_486.0},
-    "data_science": {2026: 242_542.0, 2027: 384_737.0, 2028: 480_167.0, 2029: 702_809.0, 2030: 790_259.0},
-}
+def _total_func_operacional_ref_from_csv() -> dict[int, float]:
+    """Soma de headcounts por ano (2026+) — alinhado a `headcount_funcionarios_bu.csv`."""
+    hc = load_headcount_funcionarios_bu_csv()
+    out: dict[int, float] = {}
+    for _, row in hc.iterrows():
+        ano = int(row["ano"])
+        if ano < 2026:
+            continue
+        out[ano] = (
+            float(row["func_fopm"])
+            + float(row["func_renovacao"])
+            + float(row["func_ams"])
+            + float(row["func_venda_sw"])
+            + float(row["func_data_science"])
+        )
+    return out
+
+
+# Usado por `dcf.bp.total_func_operacional_com_2025` quando não há DataFrames em memória.
+TOTAL_FUNC_OPERACIONAL_REF = _total_func_operacional_ref_from_csv()
 
 
 def projetar_dre_administrativa(
@@ -53,6 +65,8 @@ def projetar_dre_administrativa(
     resultados: list[dict] = []
 
     rateio_total_ant = RATEIO_TOTAL_2025
+    hc_tab = load_headcount_funcionarios_bu_csv()
+    serie_pool_proj = serie_rateio_pool_negativo(ANOS_RATEIO_PROJECAO)
 
     for ano in anos_list:
         inflacao = INFLACAO_FOCUS[ano]
@@ -61,12 +75,26 @@ def projetar_dre_administrativa(
         outras_desp_adm = rl_consolidada_ref * RATIO_OUTRAS_ADM_PCT_RL_CONSOLIDADA
         rateio_adm_total = -(rateio_total_ant * (1.0 + inflacao))
 
-        total_func_operacional = TOTAL_FUNC_OPERACIONAL_REF[ano]
-        rateio_fopm = RATEIO_POR_BU_FIXO["fopm"][ano]
-        rateio_renovacao = RATEIO_POR_BU_FIXO["renovacao"][ano]
-        rateio_ams = RATEIO_POR_BU_FIXO["ams"][ano]
-        rateio_venda_sw = RATEIO_POR_BU_FIXO["venda_sw"][ano]
-        rateio_data_science = RATEIO_POR_BU_FIXO["data_science"][ano]
+        row_h = hc_tab[hc_tab["ano"] == ano].iloc[0]
+        funcs = {
+            "fopm": float(row_h["func_fopm"]),
+            "renovacao": float(row_h["func_renovacao"]),
+            "ams": float(row_h["func_ams"]),
+            "venda_sw": float(row_h["func_venda_sw"]),
+            "data_science": float(row_h["func_data_science"]),
+        }
+        total_func_operacional = sum(funcs.values())
+        rp = row_h.get("rateio_pool")
+        if pd.isna(rp):
+            rateio_neg = serie_pool_proj[ano]
+        else:
+            rateio_neg = float(rp)
+        rdist = distribuir_rateio_por_headcount(rateio_neg, funcs)
+        rateio_fopm = rdist["fopm"]
+        rateio_renovacao = rdist["renovacao"]
+        rateio_ams = rdist["ams"]
+        rateio_venda_sw = rdist["venda_sw"]
+        rateio_data_science = rdist["data_science"]
 
         ebitda = (
             MC2_FIXO

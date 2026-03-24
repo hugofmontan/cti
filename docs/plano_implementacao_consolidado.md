@@ -98,31 +98,28 @@ Rateio_Consolidado = 0  (cancela internamente — não some na DRE consolidada)
 
 ### D&A Consolidada
 
-A D&A consolidada é calculada como a diferença entre a D&A da AMS
-(única BU com ativos depreciáveis) e a amortização de ágios registrada
-no CONS. FORMATO PARCEIRO:
+A **`da_consolidada`** do consolidado é a mesma do **BP** (`montar_bp` →
+coluna **`da_total`**): depreciação da cascata de **CAPEX de expansão**
+(20% do investimento por ano, em 5 anos por safra), alinhada ao DCF/FCFF.
+**Não** usa mais `D&A_AMS − |Amortização_CFP|`.
 
 ```
-D&A_Consolidada(t) = D&A_AMS(t) − |Amortização_CFP(t)|
+D&A_Consolidada(t) = da_total_BP(t)
 ```
 
-Onde `Amortização_CFP` é o valor da linha D&A do CONS. FORMATO PARCEIRO,
-que tem **sinal negativo** (é amortização de ágios que reduz custo, não
-depreciação normal). Ao subtrair o valor absoluto da amortização da D&A
-da AMS, obtém-se a D&A líquida que entra no Consolidado.
+Implementação: monta-se um DataFrame com as linhas operacionais do
+consolidado (soma das BUs) e chama-se `montar_bp(...)` com o mesmo
+headcount operacional usado no DCF; `da_consolidada` = `da_total`.
 
-Confirmação:
+Confirmação (valores de referência — devem bater com `da_total` do BP):
 
-| Ano  | D&A AMS    | Amort. CFP  | D&A Consolidada |
-|------|-----------|------------|----------------|
-| 2026 | 270.677   | −189.520   | **81.157**      |
-| 2027 | 276.189   | −178.575   | **97.614**      |
-| 2028 | 282.034   | −170.519   | **111.516**     |
-| 2029 | 287.762   | −151.534   | **136.228**     |
-| 2030 | 294.784   | −139.244   | **155.539**     |
-
-A amortização do CFP decresce em cascata — não há regra simples para
-derivá-la. Para a implementação, usar os valores fixos da planilha acima.
+| Ano  | D&A Consolidada (`da_total` BP) |
+|------|--------------------------------|
+| 2026 | **81.157**                     |
+| 2027 | **97.614**                     |
+| 2028 | **111.516**                    |
+| 2029 | **136.228**                    |
+| 2030 | **155.539**                    |
 
 ```
 EBIT(t) = EBITDA(t) − D&A_Consolidada(t)
@@ -308,8 +305,8 @@ Tolerância: diferença absoluta < R$ 1,00 por célula.
 Se o EBITDA divergir → alguma BU individual está com valor errado. Comparar
 o EBITDA de cada BU com o gabarito individual antes de consolidar.
 
-Se o EBIT divergir → checar D&A consolidada. Ela não é a soma das D&As das BUs:
-é `D&A_AMS − |Amortização_CFP|`. Usar os valores fixos da tabela acima.
+Se o EBIT divergir → checar **`da_consolidada`**: deve ser igual a **`da_total`**
+do `montar_bp` (cascata de CAPEX). Não é a soma das D&As das BUs individuais.
 
 Se a Receita Financeira divergir → confirmar que o rendimento usa
 `SELIC_Focus × 0,95` aplicado sobre o **caixa do ano anterior**
@@ -330,10 +327,9 @@ rateio que reduz seu EBITDA. Na soma consolidada, esse débito e o crédito
 correspondente da ADM se cancelam. Incluir o rateio na soma daria EBITDA
 consolidado menor do que deveria.
 
-**A D&A consolidada não é a soma das D&As das BUs.** A AMS tem D&A própria
-de R$ 270.677, mas o consolidado usa apenas R$ 81.157. A diferença é
-absorvida pela amortização de ágios do CONS. FORMATO PARCEIRO, que tem sinal
-negativo. A fórmula correta é `D&A_AMS − |Amortização_CFP|`.
+**A D&A consolidada não é a soma das D&As das BUs.** Ela vem do **BP**
+(`da_total`), com base no CAPEX de expansão e na regra de depreciação em
+cascata — a mesma usada no fluxo de caixa livre (DCF).
 
 **A Receita Financeira usa o caixa do ano anterior.** Para calcular a Rec.
 Fin. de 2026, usa-se o caixa de 2025 (R$ 8.018.000), não o caixa de 2026.

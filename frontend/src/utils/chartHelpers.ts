@@ -1,5 +1,6 @@
 import type { DRERow, FluxoRow, SimulateResponse } from '../types'
-import { BU_KEYS, CHART_COLORS, YEARS } from './constants'
+import { ALL_DISPLAY_YEARS, BU_KEYS, CHART_COLORS, HISTORICAL_YEAR_END, YEARS } from './constants'
+import type { DRERowMerged } from './dreMerge'
 
 export interface FCFFChartData {
   ano: string
@@ -21,6 +22,17 @@ export interface MarginTrendChartData {
   ebitda_pct: number
   ebit_pct: number
   ll_pct: number
+}
+
+/** Série com duas linhas (histórico vs projeção) para cores distintas. */
+export interface MarginTrendSplitData {
+  ano: string
+  ebitda_pct_h: number | null
+  ebitda_pct_p: number | null
+  ebit_pct_h: number | null
+  ebit_pct_p: number | null
+  ll_pct_h: number | null
+  ll_pct_p: number | null
 }
 
 export interface WaterfallChartData {
@@ -76,6 +88,11 @@ export function transformRevenueByBUData(
   return result
 }
 
+function _pctLine(numer?: number, denom?: number): number {
+  if (typeof numer !== 'number' || typeof denom !== 'number' || denom === 0) return 0
+  return (numer / denom) * 100
+}
+
 /**
  * Transform consolidado data for margin trend line chart
  */
@@ -84,10 +101,63 @@ export function transformMarginTrendData(
 ): MarginTrendChartData[] {
   return consolidado.map((row) => ({
     ano: String(row.ano),
-    ebitda_pct: ((row.ebitda / row.receita_liquida) * 100) || 0,
-    ebit_pct: ((row.ebit / row.receita_liquida) * 100) || 0,
-    ll_pct: ((row.lucro_liquido / row.receita_liquida) * 100) || 0,
+    ebitda_pct: _pctLine(row.ebitda, row.receita_liquida),
+    ebit_pct: _pctLine(row.ebit, row.receita_liquida),
+    ll_pct: _pctLine(row.lucro_liquido, row.receita_liquida),
   }))
+}
+
+/**
+ * Margens com colunas separadas para histórico (até 2025) e projeção (2026+).
+ */
+export function transformMarginTrendDataSplit(
+  consolidado: DRERowMerged[],
+): MarginTrendSplitData[] {
+  return consolidado.map((row) => {
+    const rl = row.receita_liquida
+    const e = _pctLine(row.ebitda, rl)
+    const eb = _pctLine(row.ebit, rl)
+    const ll = _pctLine(row.lucro_liquido, rl)
+    const isHist = row.ano <= HISTORICAL_YEAR_END
+    return {
+      ano: String(row.ano),
+      ebitda_pct_h: isHist ? e : null,
+      ebitda_pct_p: !isHist ? e : null,
+      ebit_pct_h: isHist ? eb : null,
+      ebit_pct_p: !isHist ? eb : null,
+      ll_pct_h: isHist ? ll : null,
+      ll_pct_p: !isHist ? ll : null,
+    }
+  })
+}
+
+/**
+ * Receita líquida por BU — histórico + projeção (série completa).
+ */
+export function transformRevenueByBUDataMerged(
+  mergedDre: Record<string, DRERowMerged[]>,
+): RevenueByBUChartData[] {
+  return ALL_DISPLAY_YEARS.map((ys) => {
+    const y = Number(ys)
+    const dataPoint: RevenueByBUChartData = {
+      ano: ys,
+      fopm: 0,
+      renovacao: 0,
+      ams: 0,
+      venda_sw: 0,
+      data_science: 0,
+      total: 0,
+    }
+    for (const buKey of BU_KEYS) {
+      const rows = mergedDre[buKey]
+      const row = rows?.find((r) => r.ano === y)
+      const rl = row?.receita_liquida
+      const v = typeof rl === 'number' ? rl : 0
+      dataPoint[buKey] = v
+      dataPoint.total += v
+    }
+    return dataPoint
+  })
 }
 
 /**

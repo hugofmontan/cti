@@ -9,28 +9,19 @@ from typing import Any
 
 import pandas as pd
 
-from ..administrativa import TOTAL_FUNC_OPERACIONAL_REF
-from .bp import carregar_consolidado_csv, montar_bp
-from .constants import ANOS_PROJECAO, FUNC_NOVOS_2026_GABARITO, G_PERPETUIDADE, WACC_FIXO
+from .bp import carregar_consolidado_csv, montar_bp, total_func_operacional_com_2025
+from .constants import ANOS_PROJECAO, G_PERPETUIDADE, WACC_FIXO
 from .dcf_valuation import montar_tabela_dcf
 from .fluxo import carregar_ams_csv, montar_fluxo
 from .ncgl import montar_ncgl
 from .sensitivity import cenarios_gabarito, matriz_wacc_g
-from .wacc import beta_ponderado_por_ano, carregar_faturamentos_bu, wacc_a_partir_de_beta
-
-
-def _total_func_operacional_com_2025() -> dict[int, float]:
-    ref = TOTAL_FUNC_OPERACIONAL_REF
-    base_2025 = ref[2026] - FUNC_NOVOS_2026_GABARITO
-    out: dict[int, float] = {2025: base_2025}
-    for y in ANOS_PROJECAO:
-        out[y] = ref[y]
-    return out
+from .wacc import beta_ponderado_por_ano, carregar_faturamentos_bu, faturamentos_bu_de_dfs, wacc_a_partir_de_beta
 
 
 def run_dcf_pipeline_from_frames(
     df_consolidado: pd.DataFrame,
     df_ams: pd.DataFrame,
+    dfs_bu: dict[str, pd.DataFrame] | None = None,
     *,
     wacc: float | None = None,
     g: float | None = None,
@@ -44,20 +35,23 @@ def run_dcf_pipeline_from_frames(
     if base_dir is None:
         base_dir = Path(__file__).resolve().parent.parent
 
-    total_func = _total_func_operacional_com_2025()
+    total_func = total_func_operacional_com_2025()
     w = WACC_FIXO if wacc is None else wacc
     g_ = G_PERPETUIDADE if g is None else g
 
     df_bp = montar_bp(df_consolidado, total_func, usar_custos_excl_gabarito=True)
     df_ncgl = montar_ncgl(df_bp)
-    df_fluxo = montar_fluxo(df_consolidado, df_ams, df_bp, df_ncgl)
+    df_fluxo = montar_fluxo(df_consolidado, df_bp, df_ncgl, df_ams)
     resultado_dcf = montar_tabela_dcf(df_fluxo, df_consolidado, wacc=w, g=g_)
 
     fcff_list = [float(df_fluxo[df_fluxo["ano"] == a]["fcff"].iloc[0]) for a in ANOS_PROJECAO]
     df_sens_mat = matriz_wacc_g(fcff_list)
     df_cenarios = cenarios_gabarito(fcff_list)
 
-    fat = carregar_faturamentos_bu(base_dir, ANOS_PROJECAO)
+    if dfs_bu:
+        fat = faturamentos_bu_de_dfs(dfs_bu, ANOS_PROJECAO)
+    else:
+        fat = carregar_faturamentos_bu(base_dir, ANOS_PROJECAO)
     betas_ano = beta_ponderado_por_ano(fat)
 
     out: dict[str, Any] = {

@@ -9,6 +9,37 @@
   margin: 0 0 var(--spacing-4);
 }
 
+.tableLegend {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  font-size: var(--font-size-xs);
+  color: var(--color-neutral-600);
+  margin: 0;
+}
+
+.swatchHist,
+.swatchProj {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+.swatchHist {
+  background: rgba(30, 64, 175, 0.35);
+  border: 1px solid rgba(30, 64, 175, 0.55);
+}
+
+.swatchProj {
+  background: rgba(5, 150, 105, 0.35);
+  border: 1px solid rgba(5, 150, 105, 0.55);
+}
+
+.swatchGap {
+  width: var(--spacing-3);
+}
+
 .tabContent {
   display: grid;
   gap: var(--spacing-4);

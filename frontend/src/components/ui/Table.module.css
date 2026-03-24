@@ -32,6 +32,26 @@
   white-space: nowrap;
 }
 
+/* Colunas ano: histórico (realizado) vs projeção */
+.colHistorical {
+  background-color: rgba(30, 64, 175, 0.09) !important;
+  color: var(--color-neutral-700);
+}
+
+.colHistoricalHeader {
+  background-color: rgba(30, 64, 175, 0.14) !important;
+  border-bottom: 2px solid rgba(30, 64, 175, 0.35);
+}
+
+.colProjected {
+  background-color: rgba(5, 150, 105, 0.08) !important;
+}
+
+.colProjectedHeader {
+  background-color: rgba(5, 150, 105, 0.13) !important;
+  border-bottom: 2px solid rgba(5, 150, 105, 0.35);
+}
+
 .table tbody tr:last-child td {
   border-bottom: none;
 }

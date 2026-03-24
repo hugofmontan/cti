@@ -3,28 +3,46 @@ import {
   Legend,
   Line,
   LineChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts'
 import type { DRERow } from '../../types'
-import { transformMarginTrendData } from '../../utils/chartHelpers'
-import { CHART_COLORS } from '../../utils/constants'
+import { transformMarginTrendDataSplit } from '../../utils/chartHelpers'
+import { HISTORICAL_YEAR_END, SERIE_HISTORICAL_COLOR, SERIE_PROJECTED_COLOR } from '../../utils/constants'
+import type { DRERowMerged } from '../../utils/dreMerge'
 import { ChartContainer } from './ChartContainer'
 
 interface MarginTrendChartProps {
-  consolidado: DRERow[]
+  consolidado: DRERow[] | DRERowMerged[]
 }
 
 export function MarginTrendChart({ consolidado }: MarginTrendChartProps) {
-  const data = transformMarginTrendData(consolidado)
+  const data = transformMarginTrendDataSplit(consolidado as DRERowMerged[])
 
   return (
     <ChartContainer title="Margem EBITDA Consolidada (% Receita Liquida)" height={300}>
+      <p
+        style={{
+          fontSize: 11,
+          color: 'var(--color-neutral-600)',
+          margin: '0 0 8px',
+        }}
+      >
+        <span style={{ color: SERIE_HISTORICAL_COLOR, fontWeight: 600 }}>—</span> Histórico &nbsp;
+        <span style={{ color: SERIE_PROJECTED_COLOR, fontWeight: 600 }}>—</span> Projeção
+      </p>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 10, right: 30, left: 10, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-light)" />
+          <ReferenceLine
+            x={String(HISTORICAL_YEAR_END)}
+            stroke="var(--color-neutral-400)"
+            strokeDasharray="4 4"
+            label={{ value: 'Projeção →', fill: 'var(--color-neutral-500)', fontSize: 11 }}
+          />
           <XAxis
             dataKey="ano"
             tick={{ fontSize: 12, fill: 'var(--color-neutral-600)' }}
@@ -39,7 +57,7 @@ export function MarginTrendChart({ consolidado }: MarginTrendChartProps) {
             domain={['auto', 'auto']}
           />
           <Tooltip
-            formatter={(value) => [`${Number(value).toFixed(2)}%`]}
+            formatter={(value) => [`${Number(value).toFixed(2)}%`, '']}
             labelFormatter={(label) => `Ano ${label}`}
             contentStyle={{
               backgroundColor: 'var(--color-bg-primary)',
@@ -51,11 +69,21 @@ export function MarginTrendChart({ consolidado }: MarginTrendChartProps) {
           <Legend wrapperStyle={{ fontSize: '12px' }} />
           <Line
             type="monotone"
-            dataKey="ebitda_pct"
-            stroke={CHART_COLORS.primary}
-            name="Margem EBITDA %"
+            dataKey="ebitda_pct_h"
+            stroke={SERIE_HISTORICAL_COLOR}
+            name="Margem EBITDA % (histórico)"
             strokeWidth={2}
-            dot={{ fill: CHART_COLORS.primary, strokeWidth: 0, r: 4 }}
+            connectNulls
+            dot={{ fill: SERIE_HISTORICAL_COLOR, strokeWidth: 0, r: 4 }}
+          />
+          <Line
+            type="monotone"
+            dataKey="ebitda_pct_p"
+            stroke={SERIE_PROJECTED_COLOR}
+            name="Margem EBITDA % (projeção)"
+            strokeWidth={2}
+            connectNulls
+            dot={{ fill: SERIE_PROJECTED_COLOR, strokeWidth: 0, r: 4 }}
           />
         </LineChart>
       </ResponsiveContainer>
