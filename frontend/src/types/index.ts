@@ -6,3 +6,12 @@ export type {
   DCFResult,
   Multiplos,
 } from './simulation'
+export type {
+  AgentMessage,
+  AgentArtifact,
+  AgentQueryRequest,
+  AgentQueryResponse,
+  AgentChartArtifact,
+  AgentTableArtifact,
+  AgentKPIArtifact,
+} from './agent'

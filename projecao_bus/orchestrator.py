@@ -11,7 +11,8 @@ import pandas as pd
 
 from .ams import RATIO_INCREMENTAL_FOPM, projetar_dre_ams
 from .consolidado import ANOS_PADRAO, projetar_dre_consolidado_de_dfs
-from .data_science import TOTAL_PROJETOS_DS, projetar_dre_data_science
+from .data_science import N_FUNCIONARIOS_DS, OCIOSIDADE as OCIOSIDADE_DS, projetar_dre_data_science
+from .administrativa import projetar_dre_administrativa
 from .dcf.constants import G_PERPETUIDADE, WACC_FIXO
 from .dcf.pipeline import run_dcf_pipeline_from_frames
 from .rateio_administrativo import aplicar_rateio_projetado_nas_dres
@@ -45,7 +46,8 @@ def premissas_padrao() -> dict[str, Any]:
         "ams": {"taxa_conversao_fopm": RATIO_INCREMENTAL_FOPM, "churn": 0.0},
         "venda_softwares": {"fator_crescimento_real": FATOR_CRESCIMENTO_REAL},
         "data_science": {
-            "total_projetos_por_ano": {str(y): TOTAL_PROJETOS_DS[y] for y in ANOS},
+            "headcount_por_ano": {str(y): N_FUNCIONARIOS_DS[y] for y in ANOS},
+            "ociosidade_por_ano": {str(y): OCIOSIDADE_DS for y in ANOS},
         },
         "dcf": {"wacc": WACC_FIXO, "g": G_PERPETUIDADE},
     }
@@ -115,10 +117,19 @@ def run_simulation(
     df_vsw = projetar_dre_venda_softwares(anos=ANOS, fator_crescimento_real=fcr)
 
     ds = p["data_science"]
-    tp_def = {y: TOTAL_PROJETOS_DS[y] for y in ANOS}
-    total_projetos = _merge_int_year_dict(tp_def, ds.get("total_projetos_por_ano"))
-    total_projetos = {k: int(v) for k, v in total_projetos.items()}
-    df_ds = projetar_dre_data_science(anos=ANOS, total_projetos_por_ano=total_projetos)
+    hc_ds_def = {y: N_FUNCIONARIOS_DS[y] for y in ANOS}
+    oc_ds_def = {y: OCIOSIDADE_DS for y in ANOS}
+    headcount_ds = _merge_int_year_dict(hc_ds_def, ds.get("headcount_por_ano"))
+    headcount_ds = {k: int(v) for k, v in headcount_ds.items()}
+    ociosidade_ds = _merge_int_year_dict(oc_ds_def, ds.get("ociosidade_por_ano"))
+    ociosidade_ds = {k: float(v) for k, v in ociosidade_ds.items()}
+    df_ds = projetar_dre_data_science(
+        anos=ANOS,
+        headcount_por_ano=headcount_ds,
+        ociosidade_por_ano=ociosidade_ds,
+    )
+
+    df_adm = projetar_dre_administrativa(anos=ANOS)
 
     dfs = {
         "fopm": df_fopm,
@@ -126,6 +137,7 @@ def run_simulation(
         "ams": df_ams,
         "venda_sw": df_vsw,
         "data_science": df_ds,
+        "administrativa": df_adm,
     }
 
     aplicar_rateio_projetado_nas_dres(dfs)
@@ -143,7 +155,8 @@ def run_simulation(
     dcf_bundle = run_dcf_pipeline_from_frames(
         df_cons,
         df_ams,
-        dfs_bu=dfs,
+        # O modelo DCF usa apenas as BUs operacionais para faturamento/WACC.
+        dfs_bu={k: dfs[k] for k in ("fopm", "renovacao", "ams", "venda_sw", "data_science")},
         wacc=wacc,
         g=g,
         base_dir=base_dir,

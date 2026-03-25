@@ -17,14 +17,6 @@ N_FUNCIONARIOS_DS = {
     2030: 17,
 }
 
-TOTAL_PROJETOS_DS = {
-    2026: 2,
-    2027: 3,
-    2028: 4,
-    2029: 5,
-    2030: 7,
-}
-
 HORAS_POR_PROJETO = 3840.0
 OCIOSIDADE = 0.15
 HORAS_MES = 160.0
@@ -40,14 +32,31 @@ RATIO_OUTRAS_DIR_PCT_RL = 0.0338
 RATIO_REM_SOCIOS_PCT_MC1 = 0.1656
 RATIO_OUTRAS_ADM_PCT_RL = 0.1277
 
+
+def total_projetos_de_capacidade(n_funcionarios: int, ociosidade: float) -> int:
+    """
+    Projetos inteiros cabíveis na equipe, dado HC e ociosidade (mesma base da planilha).
+    horas_alocadas = N * 160 * 12 * (1 - ociosidade); projetos = floor(horas / 3840).
+    """
+    if n_funcionarios <= 0:
+        return 0
+    oc_eff = min(max(float(ociosidade), 0.0), 0.999)
+    horas_alocadas = n_funcionarios * HORAS_MES * MESES_ANO * (1.0 - oc_eff)
+    cap = horas_alocadas / HORAS_POR_PROJETO
+    return max(0, int(math.floor(cap)))
+
+
 def projetar_dre_data_science(
     anos: Iterable[int] = (2026, 2027, 2028, 2029, 2030),
     bu: str = "DATA SCIENCE",
     *,
-    total_projetos_por_ano: dict[int, int] | None = None,
+    headcount_por_ano: dict[int, int] | None = None,
+    ociosidade_por_ano: dict[int, float] | None = None,
 ) -> pd.DataFrame:
     """
     Projeta a DRE da BU Data Science de 2026 a 2030.
+
+    O número de projetos por ano é derivado de headcount e ociosidade (capacidade em horas).
     """
     anos_list = _validar_anos(anos)
     resultados: list[dict] = []
@@ -56,15 +65,20 @@ def projetar_dre_data_science(
     custo_func_ant = CUSTO_FUNC_BASE_2026
 
     for ano in anos_list:
-        n_funcionarios = N_FUNCIONARIOS_DS[ano]
-        total_projetos = (
-            total_projetos_por_ano[ano]
-            if total_projetos_por_ano is not None and ano in total_projetos_por_ano
-            else TOTAL_PROJETOS_DS[ano]
+        n_funcionarios = (
+            headcount_por_ano[ano]
+            if headcount_por_ano is not None and ano in headcount_por_ano
+            else N_FUNCIONARIOS_DS[ano]
         )
-
-        horas_alocadas = n_funcionarios * HORAS_MES * MESES_ANO * (1.0 - OCIOSIDADE)
+        oc = (
+            float(ociosidade_por_ano[ano])
+            if ociosidade_por_ano is not None and ano in ociosidade_por_ano
+            else OCIOSIDADE
+        )
+        oc_eff = min(max(oc, 0.0), 0.999)
+        horas_alocadas = n_funcionarios * HORAS_MES * MESES_ANO * (1.0 - oc_eff)
         capacidade_projetos = horas_alocadas / HORAS_POR_PROJETO
+        total_projetos = total_projetos_de_capacidade(n_funcionarios, oc)
 
         if ano == 2026:
             ticket_medio = ticket_ant

@@ -4,6 +4,8 @@ import {
   BU_NAMES,
   DRE_DISPLAY_ORDER,
   DRE_LINE_LABELS,
+  SERIE_HISTORICAL_COLOR,
+  SERIE_PROJECTED_COLOR,
   HISTORICAL_YEAR_END,
 } from '../../utils/constants'
 import type { DRERowMerged } from '../../utils/dreMerge'
@@ -43,6 +45,14 @@ interface BuOperationalPoint {
   n_funcionarios: number
   ebitda: number
   margem_ebitda_pct: number
+  margem_ebitda_pct_h: number | null
+  margem_ebitda_pct_p: number | null
+  faturamento_bruto_h: number | null
+  faturamento_bruto_p: number | null
+  n_funcionarios_h: number | null
+  n_funcionarios_p: number | null
+  ebitda_h: number | null
+  ebitda_p: number | null
   /** Para estilizar barras (opcional futuro) */
   isHistorical: boolean
 }
@@ -64,7 +74,19 @@ function getDreValue(row: DRERowMerged, key: string): number | undefined {
 }
 
 export function BUBreakdown({ dre }: BUBreakdownProps) {
-  const tabs = BU_KEYS.map((buKey) => {
+  const knownBuKeys = BU_KEYS as unknown as string[]
+  const extraBuKeys = Object.keys(dre).filter((k) => !knownBuKeys.includes(k))
+  const tabsBuKeys = [...knownBuKeys, ...extraBuKeys]
+
+  const getBuLabel = (buKey: string) => {
+    const lower = buKey.toLowerCase()
+    if (lower === 'administrativa' || lower.includes('administr')) return 'Administrativa'
+
+    const known = (BU_NAMES as Record<string, string>)[lower] ?? (BU_NAMES as Record<string, string>)[buKey]
+    return known ?? buKey
+  }
+
+  const tabs = tabsBuKeys.map((buKey) => {
     const rows = dre[buKey] ?? []
 
     const chartData: BuOperationalPoint[] = ALL_DISPLAY_YEARS.map((ys) => {
@@ -78,13 +100,38 @@ export function BUBreakdown({ dre }: BUBreakdownProps) {
             : 0
       const ebitda = typeof r?.ebitda === 'number' ? r.ebitda : 0
       const receitaLiquida = typeof r?.receita_liquida === 'number' ? r.receita_liquida : 0
+      const margem = receitaLiquida ? ebitda / receitaLiquida : 0
+      const isHistorical = y <= HISTORICAL_YEAR_END
+      const faturamentoBrutoH = isHistorical ? faturamentoBruto : null
+      const faturamentoBrutoP = !isHistorical ? faturamentoBruto : null
+
+      // Algumas BUs podem expor headcount com nomes diferentes (ex.: BU administrativa -> `n_funcionarios_adm`).
+      const nFuncionariosBase =
+        typeof r?.n_funcionarios === 'number'
+          ? r.n_funcionarios
+          : typeof (r as { n_funcionarios_adm?: unknown }).n_funcionarios_adm === 'number'
+            ? (r as { n_funcionarios_adm: number }).n_funcionarios_adm
+            : 0
+
+      const nFuncionariosH = isHistorical ? nFuncionariosBase : null
+      const nFuncionariosP = !isHistorical ? nFuncionariosBase : null
+      const ebitdaH = isHistorical ? ebitda : null
+      const ebitdaP = !isHistorical ? ebitda : null
       return {
         ano: ys,
         faturamento_bruto: faturamentoBruto,
-        n_funcionarios: typeof r?.n_funcionarios === 'number' ? r.n_funcionarios : 0,
+        n_funcionarios: nFuncionariosBase,
         ebitda,
-        margem_ebitda_pct: receitaLiquida ? ebitda / receitaLiquida : 0,
-        isHistorical: y <= HISTORICAL_YEAR_END,
+        margem_ebitda_pct: margem,
+        margem_ebitda_pct_h: isHistorical ? margem : null,
+        margem_ebitda_pct_p: !isHistorical ? margem : null,
+        faturamento_bruto_h: faturamentoBrutoH,
+        faturamento_bruto_p: faturamentoBrutoP,
+        n_funcionarios_h: nFuncionariosH,
+        n_funcionarios_p: nFuncionariosP,
+        ebitda_h: ebitdaH,
+        ebitda_p: ebitdaP,
+        isHistorical,
       }
     })
 
@@ -115,7 +162,7 @@ export function BUBreakdown({ dre }: BUBreakdownProps) {
 
     return {
       id: buKey,
-      label: BU_NAMES[buKey],
+      label: getBuLabel(buKey),
       content: (
         <div className={styles.tabContent}>
           <p className={styles.tableLegend}>
@@ -127,8 +174,8 @@ export function BUBreakdown({ dre }: BUBreakdownProps) {
 
           <div className={styles.chartsGrid}>
             <ChartContainer
-              title={`Evolucao do Faturamento Bruto e Funcionarios — ${BU_NAMES[buKey]}`}
-              height={300}
+              title={`Evolucao do Faturamento Bruto e Funcionarios — ${getBuLabel(buKey)}`}
+              height={320}
             >
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={chartData}>
@@ -143,21 +190,25 @@ export function BUBreakdown({ dre }: BUBreakdownProps) {
                   <YAxis yAxisId="func" orientation="right" />
                   <Tooltip
                     formatter={(value, name) => {
-                      if (name === 'n_funcionarios') return [Number(value).toFixed(1), 'Funcionarios']
+                      if (name === 'n_funcionarios')
+                        return [Number(value).toFixed(1), 'Funcionarios']
                       return [fmtBRL(Number(value)), 'Faturamento Bruto']
                     }}
                   />
                   <Legend
                     formatter={(value) =>
-                      value === 'n_funcionarios' ? 'Funcionarios' : 'Faturamento Bruto'
+                      value === 'n_funcionarios'
+                        ? 'Funcionarios'
+                        : value === 'faturamento_bruto_h'
+                          ? 'Faturamento Bruto (Hist.)'
+                          : value === 'faturamento_bruto_p'
+                            ? 'Faturamento Bruto (Proj.)'
+                            : '—'
                     }
                   />
-                  <Bar
-                    yAxisId="valor"
-                    dataKey="faturamento_bruto"
-                    fill="var(--color-primary-900)"
-                    name="faturamento_bruto"
-                  />
+                  <Bar yAxisId="valor" dataKey="faturamento_bruto_h" fill={SERIE_HISTORICAL_COLOR} name="faturamento_bruto_h" />
+                  <Bar yAxisId="valor" dataKey="faturamento_bruto_p" fill={SERIE_PROJECTED_COLOR} name="faturamento_bruto_p" />
+
                   <Line
                     yAxisId="func"
                     type="monotone"
@@ -178,7 +229,7 @@ export function BUBreakdown({ dre }: BUBreakdownProps) {
               </ResponsiveContainer>
             </ChartContainer>
 
-            <ChartContainer title={`EBITDA e Margem EBITDA — ${BU_NAMES[buKey]}`} height={300}>
+            <ChartContainer title={`EBITDA e Margem EBITDA — ${getBuLabel(buKey)}`} height={320}>
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-light)" />
@@ -196,24 +247,31 @@ export function BUBreakdown({ dre }: BUBreakdownProps) {
                   />
                   <Tooltip
                     formatter={(value, name) => {
-                      if (name === 'margem_ebitda_pct') return [fmtPct(Number(value)), 'Margem EBITDA']
+                      if (name === 'margem_ebitda_pct_h' || name === 'margem_ebitda_pct_p' || name === 'margem_ebitda_pct')
+                        return [fmtPct(Number(value)), 'Margem EBITDA']
                       return [fmtBRL(Number(value)), 'EBITDA']
                     }}
                   />
                   <Legend
-                    formatter={(value) => (value === 'margem_ebitda_pct' ? 'Margem EBITDA' : 'EBITDA')}
+                    formatter={(value) => {
+                      if (
+                        value === 'margem_ebitda_pct_h' ||
+                        value === 'margem_ebitda_pct_p' ||
+                        value === 'margem_ebitda_pct'
+                      )
+                        return 'Margem EBITDA'
+                      if (value === 'ebitda_h') return 'EBITDA (Hist.)'
+                      if (value === 'ebitda_p') return 'EBITDA (Proj.)'
+                      return 'EBITDA'
+                    }}
                   />
-                  <Bar
-                    yAxisId="valor"
-                    dataKey="ebitda"
-                    fill="var(--color-primary-900)"
-                    name="ebitda"
-                  />
+                  <Bar yAxisId="valor" dataKey="ebitda_h" fill={SERIE_HISTORICAL_COLOR} name="ebitda_h" />
+                  <Bar yAxisId="valor" dataKey="ebitda_p" fill={SERIE_PROJECTED_COLOR} name="ebitda_p" />
                   <Line
                     yAxisId="pct"
                     type="monotone"
                     dataKey="margem_ebitda_pct"
-                    stroke="var(--color-negative)"
+                    stroke="var(--color-warning)"
                     strokeWidth={2}
                     dot={{ r: 3 }}
                     name="margem_ebitda_pct"
@@ -222,7 +280,7 @@ export function BUBreakdown({ dre }: BUBreakdownProps) {
                       dataKey="margem_ebitda_pct"
                       position="top"
                       formatter={(v) => fmtPct(Number(v), 1)}
-                      style={{ fill: 'var(--color-negative)', fontSize: 11, fontWeight: 600 }}
+                      style={{ fill: 'var(--color-warning)', fontSize: 11, fontWeight: 600 }}
                     />
                   </Line>
                 </ComposedChart>

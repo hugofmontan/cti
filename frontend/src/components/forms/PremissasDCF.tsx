@@ -1,6 +1,6 @@
 import type { Premissas } from '../../types'
 import { Panel } from '../ui/Panel'
-import { Input } from '../ui/Input'
+import { SliderValueWithInput } from '../ui/SliderValueWithInput'
 import styles from './PremissasForm.module.css'
 
 interface PremissasDCFProps {
@@ -17,21 +17,33 @@ export function PremissasDCF({
   return (
     <Panel title="DCF - WACC e Crescimento Perpetuidade" defaultOpen>
       <div className={styles.row2}>
-        <Input
+        <SliderValueWithInput
           label="WACC"
-          type="number"
-          step={0.0001}
           value={premissas.dcf.wacc}
-          onChange={(e) => onWaccChange(Number(e.target.value))}
-          hint="Decimal, ex: 0.1712 = 17.12%"
+          onChange={onWaccChange}
+          min={0.05}
+          max={0.35}
+          step={0.0005}
+          hint="Exibido como % (modelo usa decimal)."
+          displayScale={100}
+          formatDisplay={(v) => `${v.toFixed(2)}%`}
+          inputScale={100}
+          inputStep={0.1}
+          displayDecimals={2}
         />
-        <Input
+        <SliderValueWithInput
           label="g (Perpetuidade)"
-          type="number"
-          step={0.001}
           value={premissas.dcf.g}
-          onChange={(e) => onGChange(Number(e.target.value))}
-          hint="Taxa de crescimento perpetuo, decimal"
+          onChange={onGChange}
+          min={0}
+          max={0.08}
+          step={0.001}
+          hint="Exibido como % (modelo usa decimal)."
+          displayScale={100}
+          formatDisplay={(v) => `${v.toFixed(2)}%`}
+          inputScale={100}
+          inputStep={0.1}
+          displayDecimals={2}
         />
       </div>
     </Panel>

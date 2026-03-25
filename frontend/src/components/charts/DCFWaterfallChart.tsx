@@ -63,7 +63,7 @@ export function DCFWaterfallChart({ dcf }: DCFWaterfallChartProps) {
   })
 
   return (
-    <ChartContainer title="Composicao do Enterprise Value (DCF)" height={330}>
+    <ChartContainer title="Composicao do Enterprise Value (DCF)" height={470}>
       <div className={styles.metaRow}>
         <div className={styles.metaCard}>
           <span className={styles.metaLabel}>% VP Fluxos Explicitos</span>
@@ -74,8 +74,8 @@ export function DCFWaterfallChart({ dcf }: DCFWaterfallChartProps) {
           <strong className={styles.metaValue}>{fmtPct(pctTerminal)}</strong>
         </div>
       </div>
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 10, right: 30, left: 10, bottom: 0 }}>
+      <ResponsiveContainer width="100%" height="95%">
+        <BarChart data={data} margin={{ top: 10, right: 30, left: 10, bottom: 40 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-light)" />
           <XAxis
             dataKey="name"

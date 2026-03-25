@@ -95,16 +95,32 @@ export function usePremissas({ premissas, setPremissas }: UsePremissasArgs) {
     )
   }, [])
 
-  // Data Science setter
-  const setDataScienceProjetos = useCallback((year: YearKey, value: number) => {
+  const setDataScienceHeadcount = useCallback((year: YearKey, value: number) => {
     setPremissas((prev) =>
       prev
         ? {
             ...prev,
             data_science: {
               ...prev.data_science,
-              total_projetos_por_ano: {
-                ...prev.data_science.total_projetos_por_ano,
+              headcount_por_ano: {
+                ...prev.data_science.headcount_por_ano,
+                [year]: value,
+              },
+            },
+          }
+        : prev
+    )
+  }, [])
+
+  const setDataScienceOciosidade = useCallback((year: YearKey, value: number) => {
+    setPremissas((prev) =>
+      prev
+        ? {
+            ...prev,
+            data_science: {
+              ...prev.data_science,
+              ociosidade_por_ano: {
+                ...prev.data_science.ociosidade_por_ano,
                 [year]: value,
               },
             },
@@ -149,8 +165,8 @@ export function usePremissas({ premissas, setPremissas }: UsePremissasArgs) {
     setAmsChurn,
     // Venda Softwares
     setVendaSoftwaresFator,
-    // Data Science
-    setDataScienceProjetos,
+    setDataScienceHeadcount,
+    setDataScienceOciosidade,
     // DCF
     setDcfWacc,
     setDcfG,

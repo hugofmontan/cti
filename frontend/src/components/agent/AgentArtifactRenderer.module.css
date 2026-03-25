@@ -1,0 +1,17 @@
+.container {
+  display: grid;
+  gap: var(--spacing-3);
+}
+
+.block h4 {
+  margin-bottom: var(--spacing-2);
+}
+
+.kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--spacing-3);
+  border-radius: var(--radius-md);
+  background: #eef6ff;
+}

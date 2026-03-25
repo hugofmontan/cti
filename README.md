@@ -16,6 +16,7 @@ Fluxo principal:
 
 ## Documentação detalhada
 
+- **[Visão geral do projeto e do Analista IA](PROJETO.md)** — propósito, pastas, API, frontend e funcionamento do agente (pipeline, intents, `.env`).
 - **[Funcionamento do projeto (aprofundado)](docs/FUNCIONAMENTO_PROJETO.md)** — arquitetura, BUs, consolidado, DCF, API, frontend e dados.
 
 ## Quick Start
@@ -79,7 +80,7 @@ Exemplo de payload:
 - `renovacao`: receita recorrente com reajuste e churn opcional.
 - `ams`: dependente de FOPM para incremental.
 - `venda_softwares`: crescimento nominal por inflação + fator real.
-- `data_science`: projeção por número de projetos/capacidade.
+- `data_science`: receita por projetos derivados de headcount e ociosidade (capacidade em horas) × ticket.
 - `administrativa`: centro de custo para rateio interno.
 - `consolidado`: soma operacional e linhas financeiras do grupo.
 

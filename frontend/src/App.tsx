@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from 'react'
 import styles from './App.module.css'
+import { AgentPanel } from './components/agent'
 import { DashboardLayout } from './components/layout'
 import {
   PremissasAMS,
@@ -13,6 +14,7 @@ import {
   DCFWaterfallChart,
   MarginTrendChart,
   RevenueByBUChart,
+  RevenueByBUPctChart,
 } from './components/charts'
 import {
   BUBreakdown,
@@ -21,8 +23,9 @@ import {
   MultiplesSection,
   ValuationSummary,
 } from './components/sections'
-import { Alert, Button, LoadingSpinner, Panel } from './components/ui'
+import { Alert, Button, LoadingSpinner, Panel, Tabs } from './components/ui'
 import { useHistoricalDRE, usePremissas, useSimulation } from './hooks'
+import { AGENT_ENABLED } from './utils/constants'
 import { mergeConsolidadoSeries, mergeDreByBU } from './utils/dreMerge'
 
 export default function App() {
@@ -42,7 +45,8 @@ export default function App() {
   const {
     setAmsChurn,
     setAmsTaxaConversao,
-    setDataScienceProjetos,
+    setDataScienceHeadcount,
+    setDataScienceOciosidade,
     setDcfG,
     setDcfWacc,
     setFopmHeadcount,
@@ -76,81 +80,101 @@ export default function App() {
         </Alert>
       ) : null}
 
-      {!premissas ? (
-        <LoadingSpinner size="lg" />
-      ) : (
-        <>
-          <div className={styles.mainGrid}>
-            <div className={styles.premissasPanel}>
-              <Panel title="Premissas" collapsible={false}>
-                <PremissasFOPM
-                  premissas={premissas}
-                  onHeadcountChange={setFopmHeadcount}
-                  onOciosidadeChange={setFopmOciosidade}
-                />
-                <PremissasRenovacao
-                  premissas={premissas}
-                  onSpreadChange={setRenovacaoSpread}
-                  onChurnChange={setRenovacaoChurn}
-                />
-                <PremissasAMS
-                  premissas={premissas}
-                  onTaxaConversaoChange={setAmsTaxaConversao}
-                  onChurnChange={setAmsChurn}
-                />
-                <PremissasVendaSW premissas={premissas} onFatorChange={setVendaSoftwaresFator} />
-                <PremissasDataScience
-                  premissas={premissas}
-                  onProjetosChange={setDataScienceProjetos}
-                />
-                <PremissasDCF premissas={premissas} onWaccChange={setDcfWacc} onGChange={setDcfG} />
-                <div className={styles.actions}>
-                  <Button variant="primary" loading={loading} onClick={() => void runSimulation()}>
-                    Recalcular
-                  </Button>
-                </div>
-              </Panel>
-            </div>
+      {!premissas ? <LoadingSpinner size="lg" /> : (
+        <Tabs
+          tabs={[
+            {
+              id: 'dashboard',
+              label: 'Dashboard',
+              content: (
+                <>
+                  <div className={styles.mainGrid}>
+                    <div className={styles.premissasPanel}>
+                      <Panel title="Premissas" collapsible={false}>
+                        <PremissasFOPM
+                          premissas={premissas}
+                          onHeadcountChange={setFopmHeadcount}
+                          onOciosidadeChange={setFopmOciosidade}
+                        />
+                        <PremissasRenovacao
+                          premissas={premissas}
+                          onSpreadChange={setRenovacaoSpread}
+                          onChurnChange={setRenovacaoChurn}
+                        />
+                        <PremissasAMS
+                          premissas={premissas}
+                          onTaxaConversaoChange={setAmsTaxaConversao}
+                          onChurnChange={setAmsChurn}
+                        />
+                        <PremissasVendaSW premissas={premissas} onFatorChange={setVendaSoftwaresFator} />
+                        <PremissasDataScience
+                          premissas={premissas}
+                          onHeadcountChange={setDataScienceHeadcount}
+                          onOciosidadeChange={setDataScienceOciosidade}
+                        />
+                        <PremissasDCF premissas={premissas} onWaccChange={setDcfWacc} onGChange={setDcfG} />
+                        <div className={styles.actions}>
+                          <Button variant="primary" loading={loading} onClick={() => void runSimulation()}>
+                            Recalcular
+                          </Button>
+                        </div>
+                      </Panel>
+                    </div>
 
-            <div className={styles.chartsGrid}>
-              {result ? (
-                <>
-                  <ValuationSummary dcf={result.dcf} />
-                  <RevenueByBUChart dre={result.dre} mergedDre={mergedDre} />
-                  <MarginTrendChart consolidado={mergedConsolidado} />
-                  <DCFWaterfallChart dcf={result.dcf} />
-                </>
-              ) : (
-                <>
-                  {!loadingHist && historical ? (
+                    <div className={styles.chartsGrid}>
+                      {result ? (
+                        <>
+                          <ValuationSummary dcf={result.dcf} />
+                          <MultiplesSection dcf={result.dcf} />
+                          <DCFWaterfallChart dcf={result.dcf} />
+                          <RevenueByBUChart dre={result.dre} mergedDre={mergedDre} />
+                          <RevenueByBUPctChart dre={result.dre} mergedDre={mergedDre} />
+                          <MarginTrendChart consolidado={mergedConsolidado} />
+                        </>
+                      ) : (
+                        <>
+                          {!loadingHist && historical ? (
+                            <>
+                              <RevenueByBUChart dre={{}} mergedDre={mergedDre} />
+                              <RevenueByBUPctChart dre={{}} mergedDre={mergedDre} />
+                              <MarginTrendChart consolidado={mergedConsolidado} />
+                            </>
+                          ) : null}
+                          <Alert variant="info">
+                            Clique em Recalcular para carregar DCF e a projeção 2026–2030. Os gráficos acima
+                            mostram o histórico de <code>data/original</code> quando disponível.
+                          </Alert>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {historical || result ? (
                     <>
-                      <RevenueByBUChart dre={{}} mergedDre={mergedDre} />
-                      <MarginTrendChart consolidado={mergedConsolidado} />
+                      <ConsolidatedDRE consolidado={mergedConsolidado} />
+                      {result ? <CashFlowSection fluxo={result.fluxo} /> : null}
+                      <BUBreakdown dre={mergedDre} />
+                      {result?.warnings?.map((w) => (
+                        <Alert key={w} variant="warning">
+                          {w}
+                        </Alert>
+                      ))}
                     </>
                   ) : null}
-                  <Alert variant="info">
-                    Clique em Recalcular para carregar DCF e a projeção 2026–2030. Os gráficos acima
-                    mostram o histórico de <code>data/original</code> quando disponível.
-                  </Alert>
                 </>
-              )}
-            </div>
-          </div>
-
-          {historical || result ? (
-            <>
-              <ConsolidatedDRE consolidado={mergedConsolidado} />
-              {result ? <CashFlowSection fluxo={result.fluxo} /> : null}
-              {result ? <MultiplesSection dcf={result.dcf} /> : null}
-              <BUBreakdown dre={mergedDre} />
-              {result?.warnings?.map((w) => (
-                <Alert key={w} variant="warning">
-                  {w}
-                </Alert>
-              ))}
-            </>
-          ) : null}
-        </>
+              ),
+            },
+            ...(AGENT_ENABLED
+              ? [
+                  {
+                    id: 'analista-ia',
+                    label: 'Analista IA',
+                    content: <AgentPanel premissas={premissas} />,
+                  },
+                ]
+              : []),
+          ]}
+        />
       )}
     </DashboardLayout>
   )

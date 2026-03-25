@@ -105,3 +105,4 @@ export const DRE_DISPLAY_ORDER: (keyof typeof DRE_LINE_LABELS)[] = [
 ]
 
 export const API_BASE_URL = '/api'
+export const AGENT_ENABLED = (import.meta.env.VITE_AGENT_ENABLED ?? 'true') !== 'false'

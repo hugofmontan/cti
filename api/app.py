@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from .routes.agent import router as agent_router
 from .routes.simulation import router as simulation_router
 
 
@@ -14,6 +15,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     app.include_router(simulation_router)
+    app.include_router(agent_router)
     return app
 
 

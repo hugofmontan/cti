@@ -14,12 +14,12 @@ export function PremissasVendaSW({
   return (
     <Panel title="Venda de Softwares - Crescimento Real" defaultOpen={false}>
       <Input
-        label="Fator Crescimento Real"
+        label="Fator Crescimento Real (%)"
         type="number"
-        step={0.005}
-        value={premissas.venda_softwares.fator_crescimento_real}
-        onChange={(e) => onFatorChange(Number(e.target.value))}
-        hint="Ex: 0.045 = 4.5% real + inflacao"
+        step={0.5}
+        value={Number((premissas.venda_softwares.fator_crescimento_real * 100).toFixed(2))}
+        onChange={(e) => onFatorChange(Number(e.target.value) / 100)}
+        hint="Ex: 4.50 = 4.50% real + inflacao"
       />
     </Panel>
   )

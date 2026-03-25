@@ -110,8 +110,8 @@ Cada BU tem funções do tipo `projetar_dre_*` que retornam um `DataFrame` com *
 
 ### 5.5 Data Science (`data_science.py`)
 
-- Modelo por **projetos × ticket médio** × capacidade (headcount, ociosidade, horas por projeto).
-- Premissa: `total_projetos_por_ano` (merge com `TOTAL_PROJETOS_DS`).
+- Receita = **projetos inteiros × ticket médio**; o número de projetos é **derivado** de `headcount_por_ano` e `ociosidade_por_ano`: `floor(N × 160 × 12 × (1 − ociosidade) / 3.840)`.
+- Premissas no orquestrador: `headcount_por_ano`, `ociosidade_por_ano` (default 15% fixo por ano).
 
 ### 5.6 Administrativa (`administrativa.py`)
 

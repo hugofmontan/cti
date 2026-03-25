@@ -1,6 +1,6 @@
 import type { Premissas, YearKey } from '../../types'
 import { Panel } from '../ui/Panel'
-import { YearlyInputGrid } from './YearlyInputGrid'
+import { YearlySliderGrid } from './YearlySliderGrid'
 
 interface PremissasFOPMProps {
   premissas: Premissas
@@ -15,22 +15,29 @@ export function PremissasFOPM({
 }: PremissasFOPMProps) {
   return (
     <Panel title="FOPM - Funcionarios e Ociosidade (2026-2030)" defaultOpen={false}>
-      <YearlyInputGrid
+      <YearlySliderGrid
         label="Headcount"
         values={premissas.fopm.headcount_por_ano}
         onChange={onHeadcountChange}
+        min={0}
+        max={100}
         step={1}
-        min={1}
-        hint="Numero de funcionarios planejados por ano"
+        hint="Numero de funcionarios planejados por ano (slider)."
+        formatValue={(v) => `${Math.round(v)}`}
+        numberInputScale={1}
+        numberInputStep={1}
       />
-      <YearlyInputGrid
+      <YearlySliderGrid
         label="Ociosidade"
         values={premissas.fopm.ociosidade_por_ano}
         onChange={onOciosidadeChange}
-        step={0.005}
         min={0}
-        max={1}
-        hint="Taxa de ociosidade (0-1), ex: 0.05 = 5%"
+        max={0.5}
+        step={0.01}
+        hint="Exibido como porcentagem (mantemos o modelo em decimal)."
+        formatValue={(v) => `${Math.round(v * 100)}%`}
+        numberInputScale={100}
+        numberInputStep={1}
       />
     </Panel>
   )

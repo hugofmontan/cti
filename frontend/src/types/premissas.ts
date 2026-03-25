@@ -20,7 +20,8 @@ export interface VendaSoftwaresPremissas {
 }
 
 export interface DataSciencePremissas {
-  total_projetos_por_ano: Record<YearKey, number>
+  headcount_por_ano: Record<YearKey, number>
+  ociosidade_por_ano: Record<YearKey, number>
 }
 
 export interface DCFPremissas {

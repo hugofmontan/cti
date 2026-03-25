@@ -3,6 +3,7 @@ import {
   Legend,
   Line,
   LineChart,
+  LabelList,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -20,10 +21,20 @@ interface MarginTrendChartProps {
 }
 
 export function MarginTrendChart({ consolidado }: MarginTrendChartProps) {
-  const data = transformMarginTrendDataSplit(consolidado as DRERowMerged[])
+  const dataBase = transformMarginTrendDataSplit(consolidado as DRERowMerged[])
+  const anoHist = HISTORICAL_YEAR_END
+  const anoProj = HISTORICAL_YEAR_END + 1
+
+  // Série auxiliar só para desenhar um “link” entre o último ponto do histórico e o primeiro da projeção.
+  const data = dataBase.map((row) => {
+    const y = Number(row.ano)
+    const linkValue =
+      y === anoHist ? row.ebitda_pct_h : y === anoProj ? row.ebitda_pct_p : null
+    return { ...row, ebitda_pct_link: linkValue }
+  })
 
   return (
-    <ChartContainer title="Margem EBITDA Consolidada (% Receita Liquida)" height={300}>
+    <ChartContainer title="Margem EBITDA Consolidada (% Receita Liquida)" height={340}>
       <p
         style={{
           fontSize: 11,
@@ -35,7 +46,7 @@ export function MarginTrendChart({ consolidado }: MarginTrendChartProps) {
         <span style={{ color: SERIE_PROJECTED_COLOR, fontWeight: 600 }}>—</span> Projeção
       </p>
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data} margin={{ top: 10, right: 30, left: 10, bottom: 0 }}>
+        <LineChart data={data} margin={{ top: 20, right: 30, left: 10, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-light)" />
           <ReferenceLine
             x={String(HISTORICAL_YEAR_END)}
@@ -50,7 +61,7 @@ export function MarginTrendChart({ consolidado }: MarginTrendChartProps) {
             tickLine={false}
           />
           <YAxis
-            tickFormatter={(v) => `${v.toFixed(0)}%`}
+            tickFormatter={(v) => `${v.toFixed(1)}%`}
             tick={{ fontSize: 12, fill: 'var(--color-neutral-600)' }}
             axisLine={false}
             tickLine={false}
@@ -75,7 +86,13 @@ export function MarginTrendChart({ consolidado }: MarginTrendChartProps) {
             strokeWidth={2}
             connectNulls
             dot={{ fill: SERIE_HISTORICAL_COLOR, strokeWidth: 0, r: 4 }}
-          />
+          >
+            <LabelList
+              dataKey="ebitda_pct_h"
+              position="top"
+              formatter={(v) => `${Number(v).toFixed(1)}%`}
+            />
+          </Line>
           <Line
             type="monotone"
             dataKey="ebitda_pct_p"
@@ -84,6 +101,22 @@ export function MarginTrendChart({ consolidado }: MarginTrendChartProps) {
             strokeWidth={2}
             connectNulls
             dot={{ fill: SERIE_PROJECTED_COLOR, strokeWidth: 0, r: 4 }}
+          >
+            <LabelList
+              dataKey="ebitda_pct_p"
+              position="top"
+              formatter={(v) => `${Number(v).toFixed(1)}%`}
+            />
+          </Line>
+
+          <Line
+            type="monotone"
+            dataKey="ebitda_pct_link"
+            stroke={SERIE_PROJECTED_COLOR}
+            strokeWidth={2}
+            dot={false}
+            connectNulls={false}
+            isAnimationActive={false}
           />
         </LineChart>
       </ResponsiveContainer>

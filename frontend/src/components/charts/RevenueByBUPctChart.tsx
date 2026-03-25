@@ -1,0 +1,109 @@
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  Legend,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts'
+import type { DRERow } from '../../types'
+import { fmtPct } from '../../utils/formatters'
+import { transformRevenueByBUPctData, transformRevenueByBUPctDataMerged } from '../../utils/chartHelpers'
+import { BU_NAMES, CHART_COLORS, HISTORICAL_YEAR_END } from '../../utils/constants'
+import type { DRERowMerged } from '../../utils/dreMerge'
+import { ChartContainer } from './ChartContainer'
+
+interface RevenueByBUPctChartProps {
+  dre: Record<string, DRERow[]>
+  /** Quando informado, usa série completa (histórico + projeção). */
+  mergedDre?: Record<string, DRERowMerged[]> | null
+}
+
+export function RevenueByBUPctChart({ dre, mergedDre }: RevenueByBUPctChartProps) {
+  const data =
+    mergedDre && Object.keys(mergedDre).length > 0
+      ? transformRevenueByBUPctDataMerged(mergedDre)
+      : transformRevenueByBUPctData(dre)
+
+  return (
+    <ChartContainer title="Receita Liquida por BU (%) (Empilhado)" height={350}>
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={data} margin={{ top: 10, right: 30, left: 10, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-light)" />
+          {mergedDre ? (
+            <ReferenceLine
+              x={String(HISTORICAL_YEAR_END)}
+              stroke="var(--color-neutral-400)"
+              strokeDasharray="4 4"
+            />
+          ) : null}
+
+          <XAxis
+            dataKey="ano"
+            tick={{ fontSize: 12, fill: 'var(--color-neutral-600)' }}
+            axisLine={{ stroke: 'var(--color-border-light)' }}
+            tickLine={false}
+          />
+
+          <YAxis
+            tickFormatter={(v) => fmtPct(v, 0)}
+            tick={{ fontSize: 12, fill: 'var(--color-neutral-600)' }}
+            axisLine={false}
+            tickLine={false}
+            domain={[0, 1]}
+          />
+
+          <Tooltip
+            formatter={(value, name) => [
+              fmtPct(Number(value), 2),
+              BU_NAMES[name as keyof typeof BU_NAMES] || name,
+            ]}
+            labelFormatter={(label) => `Ano ${label}`}
+            contentStyle={{
+              backgroundColor: 'var(--color-bg-primary)',
+              border: '1px solid var(--color-border-light)',
+              borderRadius: 'var(--radius-md)',
+              fontSize: '12px',
+            }}
+          />
+
+          <Legend
+            formatter={(value) => BU_NAMES[value as keyof typeof BU_NAMES] || value}
+            wrapperStyle={{ fontSize: '12px' }}
+          />
+
+          <Area type="monotone" dataKey="fopm" stackId="1" fill={CHART_COLORS.fopm} stroke={CHART_COLORS.fopm} name="fopm" />
+          <Area
+            type="monotone"
+            dataKey="renovacao"
+            stackId="1"
+            fill={CHART_COLORS.renovacao}
+            stroke={CHART_COLORS.renovacao}
+            name="renovacao"
+          />
+          <Area type="monotone" dataKey="ams" stackId="1" fill={CHART_COLORS.ams} stroke={CHART_COLORS.ams} name="ams" />
+          <Area
+            type="monotone"
+            dataKey="venda_sw"
+            stackId="1"
+            fill={CHART_COLORS.venda_sw}
+            stroke={CHART_COLORS.venda_sw}
+            name="venda_sw"
+          />
+          <Area
+            type="monotone"
+            dataKey="data_science"
+            stackId="1"
+            fill={CHART_COLORS.data_science}
+            stroke={CHART_COLORS.data_science}
+            name="data_science"
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </ChartContainer>
+  )
+}
+

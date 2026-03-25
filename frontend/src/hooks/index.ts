@@ -1,4 +1,5 @@
 export { useFormatters } from './useFormatters'
+export { useAgentQuery } from './useAgentQuery'
 export { useHistoricalDRE } from './useHistoricalDRE'
 export { usePremissas } from './usePremissas'
 export { useSimulation } from './useSimulation'

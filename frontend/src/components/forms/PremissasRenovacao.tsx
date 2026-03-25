@@ -18,22 +18,24 @@ export function PremissasRenovacao({
     <Panel title="Renovacao - Spread Real e Churn" defaultOpen={false}>
       <div className={styles.row2}>
         <Input
-          label="Spread Real"
+          label="Spread Real (%)"
           type="number"
-          step={0.001}
-          value={premissas.renovacao.spread_real}
-          onChange={(e) => onSpreadChange(Number(e.target.value))}
-          hint="Ex: 0.02 = 2 p.p. alem da inflacao"
+          step={0.1}
+          min={-10}
+          max={10}
+          value={Number((premissas.renovacao.spread_real * 100).toFixed(2))}
+          onChange={(e) => onSpreadChange(Number(e.target.value) / 100)}
+          hint="Ex: 2 = 2 p.p. alem da inflacao"
         />
         <Input
-          label="Churn Anual"
+          label="Churn Anual (%)"
           type="number"
-          step={0.005}
+          step={0.1}
           min={0}
-          max={0.99}
-          value={premissas.renovacao.churn}
-          onChange={(e) => onChurnChange(Number(e.target.value))}
-          hint="Taxa de churn (0-1), aplicado ao FB"
+          max={99}
+          value={Number((premissas.renovacao.churn * 100).toFixed(2))}
+          onChange={(e) => onChurnChange(Number(e.target.value) / 100)}
+          hint="Taxa de churn (0-1) aplicada ao FB"
         />
       </div>
     </Panel>

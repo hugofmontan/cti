@@ -17,6 +17,22 @@ export interface RevenueByBUChartData {
   total: number
 }
 
+/**
+ * Transform DRE data for stacked revenue by BU (%) chart.
+ *
+ * Os valores aqui são compartilhamento em decimal (0..1), somando ~1 por ano.
+ * Isso permite que o `fmtPct` funcione diretamente para exibição (valor decimal).
+ */
+export interface RevenueByBUPctChartData {
+  ano: string
+  fopm: number
+  renovacao: number
+  ams: number
+  venda_sw: number
+  data_science: number
+  total: number
+}
+
 export interface MarginTrendChartData {
   ano: string
   ebitda_pct: number
@@ -80,6 +96,57 @@ export function transformRevenueByBUData(
           dataPoint.total += yearRow.receita_liquida
         }
       }
+    }
+
+    result.push(dataPoint)
+  }
+
+  return result
+}
+
+/**
+ * Receita líquida por BU em % (participação) — valores em decimal (0..1).
+ */
+export function transformRevenueByBUPctData(
+  dre: Record<string, DRERow[]>,
+): RevenueByBUPctChartData[] {
+  const result: RevenueByBUPctChartData[] = []
+
+  for (const year of YEARS) {
+    const yearNum = parseInt(year)
+
+    const rlByBu: Record<string, number> = {
+      fopm: 0,
+      renovacao: 0,
+      ams: 0,
+      venda_sw: 0,
+      data_science: 0,
+    }
+
+    let total = 0
+
+    for (const buKey of BU_KEYS) {
+      const buData = dre[buKey]
+      if (buData) {
+        const yearRow = buData.find((row) => row.ano === yearNum)
+        const rl = yearRow?.receita_liquida
+        const v = typeof rl === 'number' ? rl : 0
+        rlByBu[buKey] = v
+        total += v
+      }
+    }
+
+    const denom = total
+    const share = (v: number) => (denom === 0 ? 0 : v / denom)
+
+    const dataPoint: RevenueByBUPctChartData = {
+      ano: year,
+      fopm: share(rlByBu.fopm),
+      renovacao: share(rlByBu.renovacao),
+      ams: share(rlByBu.ams),
+      venda_sw: share(rlByBu.venda_sw),
+      data_science: share(rlByBu.data_science),
+      total: denom === 0 ? 0 : 1,
     }
 
     result.push(dataPoint)
@@ -157,6 +224,49 @@ export function transformRevenueByBUDataMerged(
       dataPoint.total += v
     }
     return dataPoint
+  })
+}
+
+/**
+ * Receita líquida por BU em % (participação) — valores em decimal (0..1).
+ */
+export function transformRevenueByBUPctDataMerged(
+  mergedDre: Record<string, DRERowMerged[]>,
+): RevenueByBUPctChartData[] {
+  return ALL_DISPLAY_YEARS.map((ys) => {
+    const y = Number(ys)
+
+    const rlByBu: Record<string, number> = {
+      fopm: 0,
+      renovacao: 0,
+      ams: 0,
+      venda_sw: 0,
+      data_science: 0,
+    }
+
+    let total = 0
+
+    for (const buKey of BU_KEYS) {
+      const rows = mergedDre[buKey]
+      const row = rows?.find((r) => r.ano === y)
+      const rl = row?.receita_liquida
+      const v = typeof rl === 'number' ? rl : 0
+      rlByBu[buKey] = v
+      total += v
+    }
+
+    const denom = total
+    const share = (v: number) => (denom === 0 ? 0 : v / denom)
+
+    return {
+      ano: ys,
+      fopm: share(rlByBu.fopm),
+      renovacao: share(rlByBu.renovacao),
+      ams: share(rlByBu.ams),
+      venda_sw: share(rlByBu.venda_sw),
+      data_science: share(rlByBu.data_science),
+      total: denom === 0 ? 0 : 1,
+    }
   })
 }
 

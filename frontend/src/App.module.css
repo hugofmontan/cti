@@ -5,15 +5,14 @@
 
 .mainGrid {
   display: grid;
-  grid-template-columns: 420px minmax(0, 1fr);
+  grid-template-columns: 1fr;
   gap: var(--spacing-5);
   align-items: start;
   margin-bottom: var(--spacing-6);
 }
 
 .premissasPanel {
-  position: sticky;
-  top: var(--spacing-4);
+  position: static;
 }
 
 .actions {
@@ -25,7 +24,7 @@
 .chartsGrid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: var(--spacing-4);
+  gap: var(--spacing-8);
 }
 
 @media (max-width: 1100px) {

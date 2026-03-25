@@ -159,6 +159,7 @@ def load_historical_dre_bundle() -> dict[str, Any]:
         "ams": base / "dre_ams_original.csv",
         "venda_sw": base / "dre_venda_softwares_original.csv",
         "data_science": base / "dre_data_science_original.csv",
+        "administrativa": base / "dre_administrativa_original.csv",
     }
 
     out_dre: dict[str, list[dict[str, Any]]] = {}

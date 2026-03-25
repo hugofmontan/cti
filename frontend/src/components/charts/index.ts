@@ -1,5 +1,6 @@
 export { ChartContainer } from './ChartContainer'
 export { FCFFBarChart } from './FCFFBarChart'
 export { RevenueByBUChart } from './RevenueByBUChart'
+export { RevenueByBUPctChart } from './RevenueByBUPctChart'
 export { MarginTrendChart } from './MarginTrendChart'
 export { DCFWaterfallChart } from './DCFWaterfallChart'

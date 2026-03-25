@@ -3,6 +3,8 @@
   border: 1px solid var(--color-border-light);
   border-radius: var(--radius-md);
   padding: var(--spacing-4);
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .title {
@@ -14,4 +16,5 @@
 
 .chart {
   width: 100%;
+  overflow: hidden;
 }
