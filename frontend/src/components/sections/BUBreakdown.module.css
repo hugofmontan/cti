@@ -45,6 +45,39 @@
   gap: var(--spacing-4);
 }
 
+.rowLabel {
+  font-weight: var(--font-weight-medium);
+  line-height: 1.2;
+}
+
+.numericValue {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.negativeValue {
+  composes: numericValue;
+  color: var(--color-danger-700, #b42318);
+}
+
+.dreTable th,
+.dreTable td {
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.dreTable th:not(:first-child),
+.dreTable td:not(:first-child) {
+  white-space: nowrap;
+  min-width: 86px;
+}
+
+.dreTable th:first-child,
+.dreTable td:first-child {
+  min-width: 220px;
+  white-space: normal;
+}
+
 .chartsGrid {
   display: grid;
   grid-template-columns: 1fr;

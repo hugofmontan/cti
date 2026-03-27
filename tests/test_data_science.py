@@ -1,6 +1,7 @@
 import math
 
 from projecao_bus.data_science import projetar_dre_data_science, total_projetos_de_capacidade
+from projecao_bus.year_config import get_projected_years
 
 
 def test_total_projetos_de_capacidade_padrao() -> None:
@@ -17,6 +18,7 @@ def test_total_projetos_zero_se_sem_pessoal() -> None:
 
 def test_projetar_dre_deriva_projetos_do_headcount() -> None:
     df = projetar_dre_data_science()
+    assert df["ano"].tolist() == list(get_projected_years())
     for _, row in df.iterrows():
         ano = int(row["ano"])
         n = int(row["n_funcionarios"])
@@ -28,7 +30,8 @@ def test_projetar_dre_deriva_projetos_do_headcount() -> None:
 
 def test_ticket_e_fb_coerentes_com_projetos() -> None:
     df = projetar_dre_data_science()
-    row = df[df["ano"] == 2026].iloc[0]
+    first_proj_year = list(get_projected_years())[0]
+    row = df[df["ano"] == first_proj_year].iloc[0]
     tp = int(row["total_projetos"])
     tm = float(row["ticket_medio"])
     assert abs(float(row["faturamento_bruto"]) - tp * tm) < 0.01

@@ -16,5 +16,6 @@
 
 .chart {
   width: 100%;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
 }

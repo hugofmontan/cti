@@ -1,15 +1,14 @@
 import type { DRERow } from '../../types'
-import { fmtBRL } from '../../utils/formatters'
+import { fmtBRLThousandsAccounting } from '../../utils/formatters'
 import {
-  ALL_DISPLAY_YEARS,
   DRE_DISPLAY_ORDER,
   DRE_LINE_LABELS,
-  HISTORICAL_YEAR_END,
 } from '../../utils/constants'
 import type { DRERowMerged } from '../../utils/dreMerge'
 import { Table } from '../ui/Table'
 import tableStyles from '../ui/Table.module.css'
 import styles from './ConsolidatedDRE.module.css'
+import { useYearConfig } from '../../contexts/YearConfigContext'
 
 interface ConsolidatedDREProps {
   /** Série já mesclada: histórico (≤2025) + projeção (≥2026). */
@@ -17,8 +16,9 @@ interface ConsolidatedDREProps {
 }
 
 type TableRow = {
+  key: string
   linha: string
-  [year: string]: string | number
+  [year: string]: string | number | null
 }
 
 const HIGHLIGHT_ROWS = [
@@ -30,17 +30,20 @@ const HIGHLIGHT_ROWS = [
   'lucro_liquido',
 ]
 
-function getCellValue(row: DRERowMerged, key: keyof DRERow): string {
+function getCellValue(row: DRERowMerged, key: keyof DRERow): number | null {
   const value = row[key as keyof DRERowMerged]
   if (typeof value === 'number' && !Number.isNaN(value)) {
-    return fmtBRL(value)
+    return value
   }
-  return '—'
+  return null
 }
 
 export function ConsolidatedDRE({ consolidado }: ConsolidatedDREProps) {
+  const { historicalYearStart, historicalYearEnd, allDisplayYears, projectedYears } = useYearConfig()
+  const projectedYearEnd = projectedYears[projectedYears.length - 1]
   const tableData: TableRow[] = DRE_DISPLAY_ORDER.map((key) => {
     const row: TableRow = {
+      key,
       linha: DRE_LINE_LABELS[key] || key,
     }
 
@@ -57,17 +60,30 @@ export function ConsolidatedDRE({ consolidado }: ConsolidatedDREProps) {
       key: 'linha',
       header: 'Linha',
       align: 'left' as const,
-      width: '200px',
+      width: '220px',
+      render: (row: TableRow) => (
+        <span className={styles.rowLabel}>{row.linha}</span>
+      ),
     },
-    ...ALL_DISPLAY_YEARS.map((year) => {
-      const y = Number(year)
-      const isHist = y <= HISTORICAL_YEAR_END
+    ...allDisplayYears.map((y) => {
+      const isHist = y <= historicalYearEnd
       return {
-        key: year,
-        header: year,
+        key: String(y),
+        header: String(y),
         align: 'right' as const,
         headerClassName: isHist ? tableStyles.colHistoricalHeader : tableStyles.colProjectedHeader,
         cellClassName: isHist ? tableStyles.colHistorical : tableStyles.colProjected,
+        render: (row: TableRow) => {
+          const raw = row[String(y)]
+          const value = typeof raw === 'number' ? raw : null
+          if (value === null) return '—'
+          const className = value < 0 ? styles.negativeValue : styles.numericValue
+          return (
+            <span className={className}>
+              {fmtBRLThousandsAccounting(value, { zeroAsDash: true, decimals: 0 })}
+            </span>
+          )
+        },
       }
     }),
   ]
@@ -77,19 +93,22 @@ export function ConsolidatedDRE({ consolidado }: ConsolidatedDREProps) {
       <h2 className={styles.title}>DRE Consolidado</h2>
       <p className={styles.legend}>
         <span className={styles.legendSwatch} data-variant="historical" />
-        Histórico (2018–{HISTORICAL_YEAR_END}) — dados em{' '}
+        Histórico ({historicalYearStart}–{historicalYearEnd}) — dados em{' '}
         <code>data/original</code>
         <span className={styles.legendGap} />
         <span className={styles.legendSwatch} data-variant="projected" />
-        Projeção ({HISTORICAL_YEAR_END + 1}–2030) — motor da calculadora
+        Projeção ({historicalYearEnd + 1}–{projectedYearEnd}) — motor da calculadora
+        <span className={styles.legendGap} />
+        <strong>Valores exibidos em R$ mil</strong>
       </p>
       <Table
         columns={columns}
         data={tableData}
+        className={styles.dreTable}
         striped
         highlightRows={(row) => {
-          const label = row.linha as string
-          return HIGHLIGHT_ROWS.some((key) => DRE_LINE_LABELS[key] === label)
+          const rowKey = String((row as TableRow).key)
+          return HIGHLIGHT_ROWS.includes(rowKey)
         }}
       />
     </section>

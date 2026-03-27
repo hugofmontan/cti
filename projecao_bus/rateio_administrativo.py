@@ -8,39 +8,55 @@ Base 2025: |ADM!I39| = RATEIO_POOL_ABS_2025. Ver `data/historico/headcount_funci
 from __future__ import annotations
 
 import math
-from pathlib import Path
 from typing import Iterable
 
 import pandas as pd
 
-from .shared import INFLACAO_FOCUS, _validar_anos
+from .context import SimulationContext
+from .infrastructure.paths import data_historico_dir
+from .shared import sort_years_non_empty
+from .year_config import get_historical_year_end, get_projected_years
 
 # Alinhado a `consolidado.CHAVES_BU_OPERACIONAIS` (evita import circular).
 CHAVES_BU_OPERACIONAIS = ("fopm", "renovacao", "ams", "venda_sw", "data_science")
-ANOS_RATEIO_PROJECAO = (2026, 2027, 2028, 2029, 2030)
 
 RATEIO_POOL_ABS_2025 = 5_047_539.09  # |ADM!I39| — mesmo valor em administrativa.RATEIO_TOTAL_2025
 
 
-def _repo_root() -> Path:
-    return Path(__file__).resolve().parent.parent
-
-
 def load_headcount_funcionarios_bu_csv() -> pd.DataFrame:
     """Série 2018–2030: headcounts por BU e pool histórico (rateio_pool negativo, ADM)."""
-    path = _repo_root() / "data" / "historico" / "headcount_funcionarios_bu.csv"
+    path = data_historico_dir() / "headcount_funcionarios_bu.csv"
     return pd.read_csv(path)
 
 
-def serie_rateio_pool_negativo(anos: Iterable[int]) -> dict[int, float]:
+def headcount_row_for_ano(hc: pd.DataFrame, ano: int) -> pd.Series:
+    """
+    Retorna a linha de headcount para `ano`.
+
+    Se o CSV não tiver esse ano (ex.: projeção vai até 2031 mas o arquivo só tem até 2030),
+    usa a última linha com ano <= `ano` (carry-forward). Assim o horizonte de projeção
+    não fica preso ao último ano presente no CSV.
+    """
+    if hc.empty or "ano" not in hc.columns:
+        raise ValueError("headcount CSV vazio ou sem coluna 'ano'.")
+    m = hc["ano"] == int(ano)
+    if m.any():
+        return hc.loc[m].iloc[0]
+    prior = hc[hc["ano"] <= int(ano)]
+    if prior.empty:
+        prior = hc
+    return prior.sort_values("ano").iloc[-1]
+
+
+def serie_rateio_pool_negativo(ctx: SimulationContext, anos: Iterable[int]) -> dict[int, float]:
     """
     Linha ADM!J39 projetada: Rateio_pool[t] = Rateio_pool[t-1] × (1 + inflação), com sinal negativo.
     """
-    anos_l = _validar_anos(anos)
+    anos_l = sort_years_non_empty(anos)
     pool_prev = RATEIO_POOL_ABS_2025
     out: dict[int, float] = {}
     for ano in anos_l:
-        infl = INFLACAO_FOCUS[ano]
+        infl = ctx.inflacao_focus[int(ano)]
         rateio_neg = -(pool_prev * (1.0 + infl))
         out[ano] = rateio_neg
         pool_prev = abs(rateio_neg)
@@ -89,13 +105,14 @@ def _n_func_por_bu_ano(dfs: dict[str, pd.DataFrame], ano: int) -> dict[str, floa
     return out
 
 
-def aplicar_rateio_projetado_nas_dres(dfs: dict[str, pd.DataFrame]) -> None:
+def aplicar_rateio_projetado_nas_dres(dfs: dict[str, pd.DataFrame], ctx: SimulationContext) -> None:
     """
-    Preenche `rateio_adm` e recalcula EBITDA (e linhas abaixo) para 2026–2030.
+    Preenche `rateio_adm` e recalcula EBITDA (e linhas abaixo) no horizonte ativo.
     Espera `dfs` com chaves fopm, renovacao, ams, venda_sw, data_science.
     """
-    serie_pool = serie_rateio_pool_negativo(ANOS_RATEIO_PROJECAO)
-    for ano in ANOS_RATEIO_PROJECAO:
+    anos_proj = ctx.year_config.projected_years
+    serie_pool = serie_rateio_pool_negativo(ctx, anos_proj)
+    for ano in anos_proj:
         rateio_neg = serie_pool[ano]
         funcs = _n_func_por_bu_ano(dfs, ano)
         rateios = distribuir_rateio_por_headcount(rateio_neg, funcs)
@@ -146,22 +163,24 @@ def total_func_operacional_de_dfs(
     anos_projecao: Iterable[int],
 ) -> dict[int, float]:
     """
-    Headcount total operacional por ano para BP (inclui 2025 para Δfunc em 2026).
-    2025: soma do CSV histórico; 2026+: soma dos `n_funcionarios` projetados nas DREs.
+    Headcount total operacional por ano para BP (inclui último ano histórico para Δfunc).
+    ano_historico_final: soma do CSV histórico; projeção: soma dos `n_funcionarios` nas DREs.
     """
     anos_l = sorted(set(anos_projecao))
     hc = load_headcount_funcionarios_bu_csv()
-    row25 = hc[hc["ano"] == 2025].iloc[0]
-    total_2025 = (
-        float(row25["func_fopm"])
-        + float(row25["func_renovacao"])
-        + float(row25["func_ams"])
-        + float(row25["func_venda_sw"])
-        + float(row25["func_data_science"])
+    hist_end = get_historical_year_end()
+    row_hist = headcount_row_for_ano(hc, hist_end)
+    total_hist = (
+        float(row_hist["func_fopm"])
+        + float(row_hist["func_renovacao"])
+        + float(row_hist["func_ams"])
+        + float(row_hist["func_venda_sw"])
+        + float(row_hist["func_data_science"])
     )
-    out: dict[int, float] = {2025: total_2025}
+    projected_start = min(anos_l) if anos_l else hist_end + 1
+    out: dict[int, float] = {hist_end: total_hist}
     for ano in anos_l:
-        if ano < 2026:
+        if ano < projected_start:
             continue
         t = 0.0
         for k in CHAVES_BU_OPERACIONAIS:

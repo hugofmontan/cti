@@ -1,0 +1,16 @@
+.chartsGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--spacing-6);
+}
+
+.buBlock {
+  margin-bottom: var(--spacing-2);
+}
+
+.buHeading {
+  margin: 0 0 var(--spacing-3);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-neutral-900);
+}

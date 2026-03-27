@@ -1,76 +1,63 @@
+from __future__ import annotations
+
 import math
-from typing import Iterable
+from typing import TYPE_CHECKING, Iterable
 
 import numpy as np
 import pandas as pd
 
+from .context import default_simulation_context
 from .fopm import projetar_dre_fopm_brasil
-from .shared import INFLACAO_FOCUS, _validar_anos, salvar_projecao_csv
+from .premissas.ams_params import AMSProjectionParams, default_ams_projection_params
+from .shared import salvar_projecao_csv, sort_years_non_empty
 
+if TYPE_CHECKING:
+    from .context import SimulationContext
 
-ALIQUOTA_ISV_AMS = 0.123  # 12,30%
+_default_ams = default_ams_projection_params()
 
-# FB AMS 2025 usado como base para a parcela "Base Retida"
-FB_AMS_2025 = 15_293_573.83
-
-# Incremental AMS como % do FB FOPM
-RATIO_INCREMENTAL_FOPM = 0.0958  # 9,58%
-
-# Ticket médio base (média 2023–2025) e cascata pela inflação
-TICKET_AMS_BASE = 18_246.57
-
-# Custo por funcionário base (média 2023–2025) e cascata inflação+1%
-CUSTO_FUNC_AMS_BASE = 145_370.0
-
-# Horas por NF (média 2023–2025)
-HORAS_POR_NF_AMS = 105.363
-
-# Ratio de D&A por hora (somente 2025)
-RATIO_DA_AMS_POR_HORA = 2.6509
-
-# Ratios de despesas em % da RL
-RATIO_OUTRAS_DIR_PCT_RL_AMS = 0.01880
-RATIO_REM_SOCIOS_PCT_MC1_AMS = 0.11046
-RATIO_OUTRAS_ADM_PCT_RL_AMS = 0.01219
-
-# Honorários ADM Sócios Diretores históricos (para média móvel 4 anos)
-HONORARIOS_AMS_HIST = {
-    2022: 240_000.0,
-    2023: 258_000.0,
-    2024: 264_000.0,
-    2025: 264_000.0,
-}
-
-# Receita / Despesa financeira históricas
-RECEITA_FIN_AMS_HIST = {
-    2023: 109_000.0,
-    2024: 50_000.0,
-    2025: 84_000.0,
-}
-
-DESPESA_FIN_AMS_CONST = 56_667.0  # média 2023–2025
+# Reexports estáveis para orchestrator e testes (valores = defaults)
+ALIQUOTA_ISV_AMS = _default_ams.aliquota_isv_ams
+FB_AMS_2025 = _default_ams.fb_ams_2025
+RATIO_INCREMENTAL_FOPM = _default_ams.ratio_incremental_fopm
+TICKET_AMS_BASE = _default_ams.ticket_ams_base
+CUSTO_FUNC_AMS_BASE = _default_ams.custo_func_ams_base
+HORAS_POR_NF_AMS = _default_ams.horas_por_nf_ams
+CAPEX_POR_FUNC_NOVO_AMS = _default_ams.capex_por_func_novo_ams
+TAXA_DEPRECIACAO_AMS = _default_ams.taxa_depreciacao_ams
+ANOS_DEPRECIACAO_AMS = _default_ams.anos_depreciacao_ams
+RATIO_OUTRAS_DIR_PCT_RL_AMS = _default_ams.ratio_outras_dir_pct_rl_ams
+RATIO_REM_SOCIOS_PCT_MC1_AMS = _default_ams.ratio_rem_socios_pct_mc1_ams
+RATIO_OUTRAS_ADM_PCT_RL_AMS = _default_ams.ratio_outras_adm_pct_rl_ams
+HONORARIOS_AMS_HIST = _default_ams.honorarios_ams_hist
+RECEITA_FIN_AMS_HIST = _default_ams.receita_fin_ams_hist
+DESPESA_FIN_AMS_CONST = _default_ams.despesa_fin_ams_const
 
 
 def projetar_dre_ams(
     df_fopm: pd.DataFrame,
-    anos: Iterable[int] = (2026, 2027, 2028, 2029, 2030),
+    ctx: SimulationContext | None = None,
+    anos: Iterable[int] | None = None,
     bu: str = "AMS",
     *,
     taxa_conversao_fopm: float | None = None,
     churn: float = 0.0,
+    params: AMSProjectionParams | None = None,
 ) -> pd.DataFrame:
     """
-    Projeta a DRE da BU AMS de 2026 a 2030 seguindo o plano de implementação AMS.
+    Projeta a DRE da BU AMS no horizonte configurado.
 
     A projeção depende do FB da FOPM já projetado para cada ano, recebido em `df_fopm`.
 
-    taxa_conversao_fopm: fração do FB FOPM que vira receita incremental AMS (default RATIO_INCREMENTAL_FOPM).
+    taxa_conversao_fopm: fração do FB FOPM que vira receita incremental AMS (default params.ratio_incremental_fopm).
     churn: perda anual da base recorrente (0–1). Aplica-se após reajuste da base retida e antes do incremental:
-    ``rec_gross = base_ant * fator_reajuste``; ``base_retida = rec_gross * (1 - churn)``;
-    ``FB = base_retida + incremental``; estado seguinte ``base_ant = rec_gross``.
+    ``rec_gross = FB_AMS(t-1) * fator_reajuste``; ``base_retida = rec_gross * (1 - churn)``;
+    ``FB = base_retida + incremental``; estado seguinte ``FB_AMS(t-1) = FB``.
     """
-    anos_list = _validar_anos(anos)
-    ratio_inc = RATIO_INCREMENTAL_FOPM if taxa_conversao_fopm is None else taxa_conversao_fopm
+    p = params if params is not None else default_ams_projection_params()
+    ctx = ctx if ctx is not None else default_simulation_context()
+    anos_list = sort_years_non_empty(anos or ctx.year_config.projected_years)
+    ratio_inc = p.ratio_incremental_fopm if taxa_conversao_fopm is None else taxa_conversao_fopm
 
     # Mapa ano → FB FOPM projetado
     fb_fopm_por_ano = (
@@ -81,114 +68,109 @@ def projetar_dre_ams(
 
     resultados: list[dict] = []
 
-    ticket_ant = TICKET_AMS_BASE
-    custo_func_ant = CUSTO_FUNC_AMS_BASE
+    base = ctx.base_values
+    ticket_ant = base.ticket_ams_base
+    custo_func_ant = base.custo_func_ams_base
 
     # Série para média móvel de honorários (4 anos)
-    anos_honor_hist = sorted(HONORARIOS_AMS_HIST.keys())
-    honor_series = [HONORARIOS_AMS_HIST[a] for a in anos_honor_hist]
+    anos_honor_hist = sorted(p.honorarios_ams_hist.keys())
+    honor_series = [p.honorarios_ams_hist[a] for a in anos_honor_hist]
 
     # Série para média móvel da Receita Financeira (4 anos)
-    anos_rec_fin_hist = sorted(RECEITA_FIN_AMS_HIST.keys())
-    rec_fin_series = [RECEITA_FIN_AMS_HIST[a] for a in anos_rec_fin_hist]
+    anos_rec_fin_hist = sorted(p.receita_fin_ams_hist.keys())
+    rec_fin_series = [p.receita_fin_ams_hist[a] for a in anos_rec_fin_hist]
 
-    # A base retida deve evoluir sobre ela mesma. Nao usar o FB total,
-    # para nao capitalizar o incremental FOPM no ciclo seguinte.
-    base_retida_ant = FB_AMS_2025
+    fb_ams_ant_total = base.fb_ams_base
+    fator_acum_ant = 1.0
+    horas_por_nf_ant = base.horas_por_nf_ams
+    hc_ano_anterior = (
+        (base.fb_ams_base / base.ticket_ams_base) * base.horas_por_nf_ams / (160.0 * 12.0)
+        if base.ticket_ams_base
+        else 0.0
+    )
+    fator_capex_infl_acum = 1.0
+    da_por_vintage: dict[int, float] = {}
 
     for ano in anos_list:
         if ano not in fb_fopm_por_ano:
             raise ValueError(f"Faturamento Bruto FOPM para {ano} não encontrado em df_fopm.")
 
-        inflacao = INFLACAO_FOCUS[ano]
+        inflacao = ctx.inflacao_focus[int(ano)]
+        spread_real = p.spread_real_base_retida
 
-        # 1) Base retida (bruta pós-reajuste; churn reduz apenas a parcela recorrente do ano)
-        fator_reajuste = (1.0 + inflacao) * (1.0 + 0.02)
-        rec_gross = base_retida_ant * fator_reajuste
+        fator_marginal = 1.0 + inflacao + spread_real
+        fator_acum_atual = fator_acum_ant * fator_marginal
+        fator_reajuste = fator_acum_atual / fator_acum_ant
+        rec_gross = fb_ams_ant_total * fator_reajuste
         base_retida = rec_gross * (1.0 - churn)
 
-        # 2) Incremental FOPM
         incremental = fb_fopm_por_ano[ano] * ratio_inc
 
-        # 3) Faturamento Bruto
         faturamento_bruto = base_retida + incremental
 
-        # 4) Ticket Médio (cascata sobre a média histórica)
         ticket_medio = ticket_ant * (1.0 + inflacao)
 
-        # 5) NFs e Horas Totais
         nfs_projetadas = faturamento_bruto / ticket_medio if ticket_medio else math.nan
-        horas_por_nf = HORAS_POR_NF_AMS
+        horas_por_nf = horas_por_nf_ant * p.horas_por_nf_decay
         horas_totais = nfs_projetadas * horas_por_nf
 
-        # 6) N.º Funcionários (derivado)
         n_funcionarios = horas_totais / (160.0 * 12.0)
 
-        # 7) Impostos sobre Venda
-        impostos_sv = faturamento_bruto * ALIQUOTA_ISV_AMS
+        impostos_sv = faturamento_bruto * p.aliquota_isv_ams
 
-        # 8) Receita Líquida
         receita_liquida = faturamento_bruto - impostos_sv
 
-        # 10) Incentivos de Prospecção e Vendas — zerados
         incentivos = 0.0
 
-        # 11) Gastos com Pessoal (cascata)
-        custo_por_func = custo_func_ant * (1.0 + inflacao + 0.01)
+        custo_por_func = custo_func_ant * (1.0 + inflacao + p.custo_func_grau_livre_adicional)
         gastos_pessoal = n_funcionarios * custo_por_func
 
-        # 12) Outras Despesas Diretas
-        outras_desp_diretas = receita_liquida * RATIO_OUTRAS_DIR_PCT_RL_AMS
+        outras_desp_diretas = receita_liquida * p.ratio_outras_dir_pct_rl_ams
 
-        # 13) Margem Contribuição I
         mc1 = receita_liquida - gastos_pessoal - outras_desp_diretas
         mc1_pct_rl = mc1 / receita_liquida if receita_liquida else math.nan
 
-        # 14) Remuneração Direta dos Sócios
-        remuneracao_socios = mc1 * RATIO_REM_SOCIOS_PCT_MC1_AMS
+        remuneracao_socios = mc1 * p.ratio_rem_socios_pct_mc1_ams
 
-        # 15) Margem Contribuição II
         mc2 = mc1 - remuneracao_socios
         mc2_pct_rl = mc2 / receita_liquida if receita_liquida else math.nan
 
-        # 16) Outras Despesas Administrativas
-        custo_proprio_adm = receita_liquida * RATIO_OUTRAS_ADM_PCT_RL_AMS
+        custo_proprio_adm = receita_liquida * p.ratio_outras_adm_pct_rl_ams
 
-        # 17) Rateio Administrativo (pool ADM / headcount — ver `rateio_administrativo`)
         rateio_adm = 0.0
 
-        # 18) Honorários ADM Sócios Diretores (média móvel 4 anos)
         honorarios_adm = float(np.mean(honor_series[-4:]))
         honor_series.append(honorarios_adm)
         outras_desp_adm = custo_proprio_adm + rateio_adm + honorarios_adm
 
-        # 19) EBITDA
         ebitda = mc2 - outras_desp_adm
         ebitda_pct_rl = ebitda / receita_liquida if receita_liquida else math.nan
 
-        # 20) Depreciação / Amortização
-        depreciacao_amort = horas_totais * RATIO_DA_AMS_POR_HORA
+        func_novos_ams = max(0.0, n_funcionarios - hc_ano_anterior)
+        fator_capex_infl_acum *= 1.0 + inflacao
+        capex_unitario_ams = p.capex_por_func_novo_ams * fator_capex_infl_acum
+        capex_ams = func_novos_ams * capex_unitario_ams
+        da_por_vintage[ano] = capex_ams * p.taxa_depreciacao_ams
+        da_total_ams = 0.0
+        for ano_vintage, da_anual in da_por_vintage.items():
+            if ano >= ano_vintage and ano <= ano_vintage + (p.anos_depreciacao_ams - 1):
+                da_total_ams += da_anual
+        depreciacao_amort = da_total_ams
 
-        # 21) EBIT
         ebit = ebitda - depreciacao_amort
 
-        # 22) Receita Financeira (média móvel 4 anos, começando pela média 2023–2025)
         if len(rec_fin_series) < 4:
             receita_financeira = float(np.mean(rec_fin_series))
         else:
             receita_financeira = float(np.mean(rec_fin_series[-4:]))
         rec_fin_series.append(receita_financeira)
 
-        # 23) Despesa Financeira (constante)
-        despesa_financeira = DESPESA_FIN_AMS_CONST
+        despesa_financeira = p.despesa_fin_ams_const
 
-        # 24) LAIR
         lair = ebit + receita_financeira - despesa_financeira
 
-        # 25) IRPJ / CSLL (34% do LAIR)
-        irpj_csll = lair * 0.34
+        irpj_csll = lair * p.aliquota_ir_csll
 
-        # 26) Lucro Líquido
         lucro_liquido = lair - irpj_csll
 
         resultados.append(
@@ -196,6 +178,7 @@ def projetar_dre_ams(
                 "bu": bu,
                 "ano": ano,
                 "n_funcionarios": n_funcionarios,
+                "func_novos_ams": func_novos_ams,
                 "inflacao_focus": inflacao,
                 "nfs_projetadas": nfs_projetadas,
                 "horas_por_nf": horas_por_nf,
@@ -225,6 +208,9 @@ def projetar_dre_ams(
                 "ebitda": ebitda,
                 "ebitda_pct_rl": ebitda_pct_rl,
                 "depreciacao_amort": depreciacao_amort,
+                "capex_ams": capex_ams,
+                "capex_unitario_ams": capex_unitario_ams,
+                "fator_capex_infl_acum": fator_capex_infl_acum,
                 "ebit": ebit,
                 "receita_financeira": receita_financeira,
                 "despesa_financeira": despesa_financeira,
@@ -234,10 +220,12 @@ def projetar_dre_ams(
             }
         )
 
-        # Próximo ano: ancora na base bruta reajustada (antes do churn), como no modelo sem churn.
-        base_retida_ant = rec_gross
+        fb_ams_ant_total = faturamento_bruto
+        fator_acum_ant = fator_acum_atual
         ticket_ant = ticket_medio
         custo_func_ant = custo_por_func
+        horas_por_nf_ant = horas_por_nf
+        hc_ano_anterior = n_funcionarios
 
     df = pd.DataFrame(resultados)
 
@@ -245,6 +233,7 @@ def projetar_dre_ams(
         "bu",
         "ano",
         "n_funcionarios",
+        "func_novos_ams",
         "inflacao_focus",
         "nfs_projetadas",
         "horas_por_nf",
@@ -274,6 +263,9 @@ def projetar_dre_ams(
         "ebitda",
         "ebitda_pct_rl",
         "depreciacao_amort",
+        "capex_ams",
+        "capex_unitario_ams",
+        "fator_capex_infl_acum",
         "ebit",
         "receita_financeira",
         "despesa_financeira",
@@ -287,7 +279,7 @@ def projetar_dre_ams(
 
 
 def projetar_e_salvar_ams(
-    anos: Iterable[int] = (2026, 2027, 2028, 2029, 2030),
+    anos: Iterable[int] | None = None,
     bu: str = "AMS",
 ):
     """
@@ -304,4 +296,3 @@ if __name__ == "__main__":
     df_ams = projetar_dre_ams(df_fopm=df_fopm)
     caminho = salvar_projecao_csv(df_ams, nome_arquivo="projecao_ams.csv")
     print(f"Projeção AMS salva em: {caminho}")
-

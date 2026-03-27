@@ -2,12 +2,25 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+.pytest_cache/
 .venv/
 venv/
 .env
 *.env
+.cursor/
 projecao_bus/projecoes/
 projecao_bus/dcf_output/
+
+# Dados históricos oficiais ficam NO repositório (commit):
+#   data/original/     — DREs e consolidado padrão
+#   data/historico/    — BP, headcount, séries auxiliares
+#   data/test_uploads/ — fixtures de teste (ex.: cenário fictício)
+# Somente uploads feitos em runtime pela API ficam fora do Git:
+data/uploads/active/
 frontend/dist/
 node_modules/
+
+# CSVs soltos na raiz (não versionar; dados vivem em data/)
+/balanço_original_*.csv
+/gabarito_balanço*.csv
 

@@ -21,6 +21,7 @@ from .constants import (
     RF_NTN_B,
     WACC_FIXO,
 )
+from ..year_config import get_projected_years
 
 
 def carregar_faturamentos_bu(base_dir: Path, anos: Iterable[int]) -> dict[int, dict[str, float]]:
@@ -99,8 +100,9 @@ def wacc_a_partir_de_beta(beta_u: float) -> float:
 
 def wacc_por_ano_projecao(
     base_dir: Path | None = None,
-    anos: tuple[int, ...] = (2026, 2027, 2028, 2029, 2030),
+    anos: tuple[int, ...] | None = None,
 ) -> dict[int, float]:
+    anos = anos or get_projected_years()
     if base_dir is None:
         base_dir = Path(__file__).resolve().parent.parent
     fat = carregar_faturamentos_bu(base_dir, anos)
@@ -108,7 +110,7 @@ def wacc_por_ano_projecao(
     return {a: wacc_a_partir_de_beta(betas_u[a]) for a in anos}
 
 
-def wacc_para_dcf(usar_fixo: bool = True, ano_representativo: int = 2029) -> float:
+def wacc_para_dcf(usar_fixo: bool = True, ano_representativo: int | None = None) -> float:
     """
     Plano: pode usar WACC fixo 17,124% (β ~ ano representativo) ou série anual.
     """
@@ -116,4 +118,9 @@ def wacc_para_dcf(usar_fixo: bool = True, ano_representativo: int = 2029) -> flo
         return WACC_FIXO
     base = Path(__file__).resolve().parent.parent
     serie = wacc_por_ano_projecao(base)
-    return serie.get(ano_representativo, WACC_FIXO)
+    if ano_representativo is not None and ano_representativo in serie:
+        return serie[ano_representativo]
+    if serie:
+        ultimo_ano = sorted(serie.keys())[-1]
+        return serie[ultimo_ano]
+    return WACC_FIXO

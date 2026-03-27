@@ -1,0 +1,12 @@
+# Dependências Python para executar o motor + API (FastAPI).
+# Instalação: pip install -r requirements.txt
+# Depois registre o pacote em modo editável: pip install -e . --no-deps
+#
+# Versões mínimas alinhadas a pyproject.toml (extras "api").
+
+pandas>=2.0.0
+numpy>=1.24.0
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+openai>=1.0.0
+python-dotenv>=1.0.0

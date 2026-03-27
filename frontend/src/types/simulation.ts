@@ -49,6 +49,34 @@ export interface FluxoRow {
   [key: string]: string | number | undefined
 }
 
+export interface BPRow {
+  ano: number
+  caixa?: number
+  clientes?: number
+  partes_relacionadas?: number
+  adiantamentos?: number
+  impostos_recuperar?: number
+  outros_ac?: number
+  ativo_circulante_total?: number
+  ativo_fiscal_diferido?: number
+  imobilizado?: number
+  depr_acumulada?: number
+  ativo_nao_circulante_total?: number
+  total_ativo?: number
+  contas_a_pagar?: number
+  fornecedores?: number
+  obrig_trabalhistas?: number
+  obrig_fiscais?: number
+  provisoes?: number
+  outras_obrigacoes?: number
+  passivo_circulante_total?: number
+  receitas_diferidas?: number
+  passivo_nao_circulante_total?: number
+  pl?: number
+  total_passivo_pl?: number
+  [key: string]: string | number | undefined
+}
+
 export interface Multiplos {
   EV_EBITDA_2026?: number
   EV_RL_2026?: number
@@ -71,7 +99,15 @@ export interface SimulateResponse {
   premissas_efetivas: Premissas
   dre: Record<string, DRERow[]>
   consolidado: DRERow[]
+  bp: BPRow[]
+  bp_historico?: BPRow[]
   fluxo: FluxoRow[]
   dcf: DCFResult
+  year_config?: {
+    historical_year_start: number
+    historical_year_end: number
+    projected_year_start: number
+    projected_years: number[]
+  }
   warnings: string[]
 }

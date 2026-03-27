@@ -1,115 +1,119 @@
 """
-Projecao DRE Data Science (2026-2030).
+Projecao DRE Data Science.
 """
 
+from __future__ import annotations
+
 import math
-from typing import Iterable
+from typing import TYPE_CHECKING, Iterable
 
 import pandas as pd
 
-from .shared import ALIQUOTA_ISV, INFLACAO_FOCUS, _validar_anos, salvar_projecao_csv
+from .context import DATA_SCIENCE_OCIOSIDADE_PADRAO, default_simulation_context
+from .premissas.data_science_params import DataScienceProjectionParams, default_data_science_projection_params
+from .premissas.defaults import default_headcount_ds
+from .shared import ALIQUOTA_ISV, salvar_projecao_csv, sort_years_non_empty
 
-N_FUNCIONARIOS_DS = {
-    2026: 5,
-    2027: 8,
-    2028: 10,
-    2029: 15,
-    2030: 17,
-}
+if TYPE_CHECKING:
+    from .context import SimulationContext
 
-HORAS_POR_PROJETO = 3840.0
-OCIOSIDADE = 0.15
-HORAS_MES = 160.0
-MESES_ANO = 12.0
+N_FUNCIONARIOS_DS = default_headcount_ds()
 
-TICKET_BASE_2026 = 1_300_000.0
-# Para reproduzir o gabarito do plano, a cascata do ticket usa 1,0397 em todos os anos > 2026.
-FATOR_CASCATA_TICKET = 1.0 + INFLACAO_FOCUS[2026]
-CUSTO_FUNC_BASE_2026 = 153_654.72
+OCIOSIDADE = DATA_SCIENCE_OCIOSIDADE_PADRAO
 
-RATIO_INCENTIVOS_PCT_RL = 0.0285
-RATIO_OUTRAS_DIR_PCT_RL = 0.0338
-RATIO_REM_SOCIOS_PCT_MC1 = 0.1656
-RATIO_OUTRAS_ADM_PCT_RL = 0.1277
+_pd = default_data_science_projection_params()
+HORAS_POR_PROJETO = _pd.horas_por_projeto
+HORAS_MES = _pd.horas_mes
+MESES_ANO = _pd.meses_ano
+RATIO_INCENTIVOS_PCT_RL = _pd.ratio_incentivos_pct_rl
+RATIO_OUTRAS_DIR_PCT_RL = _pd.ratio_outras_dir_pct_rl
+RATIO_REM_SOCIOS_PCT_MC1 = _pd.ratio_rem_socios_pct_mc1
+RATIO_OUTRAS_ADM_PCT_RL = _pd.ratio_outras_adm_pct_rl
 
 
-def total_projetos_de_capacidade(n_funcionarios: int, ociosidade: float) -> int:
+def total_projetos_de_capacidade(
+    n_funcionarios: int,
+    ociosidade: float,
+    *,
+    params: DataScienceProjectionParams | None = None,
+) -> int:
     """
     Projetos inteiros cabíveis na equipe, dado HC e ociosidade (mesma base da planilha).
-    horas_alocadas = N * 160 * 12 * (1 - ociosidade); projetos = floor(horas / 3840).
     """
+    pr = params if params is not None else default_data_science_projection_params()
     if n_funcionarios <= 0:
         return 0
     oc_eff = min(max(float(ociosidade), 0.0), 0.999)
-    horas_alocadas = n_funcionarios * HORAS_MES * MESES_ANO * (1.0 - oc_eff)
-    cap = horas_alocadas / HORAS_POR_PROJETO
+    horas_alocadas = n_funcionarios * pr.horas_mes * pr.meses_ano * (1.0 - oc_eff)
+    cap = horas_alocadas / pr.horas_por_projeto
     return max(0, int(math.floor(cap)))
 
 
 def projetar_dre_data_science(
-    anos: Iterable[int] = (2026, 2027, 2028, 2029, 2030),
+    ctx: SimulationContext | None = None,
+    anos: Iterable[int] | None = None,
     bu: str = "DATA SCIENCE",
     *,
     headcount_por_ano: dict[int, int] | None = None,
     ociosidade_por_ano: dict[int, float] | None = None,
+    params: DataScienceProjectionParams | None = None,
 ) -> pd.DataFrame:
-    """
-    Projeta a DRE da BU Data Science de 2026 a 2030.
-
-    O número de projetos por ano é derivado de headcount e ociosidade (capacidade em horas).
-    """
-    anos_list = _validar_anos(anos)
+    pr = params if params is not None else default_data_science_projection_params()
+    ctx = ctx if ctx is not None else default_simulation_context()
+    anos_list = sort_years_non_empty(anos or ctx.year_config.projected_years)
     resultados: list[dict] = []
 
-    ticket_ant = TICKET_BASE_2026
-    custo_func_ant = CUSTO_FUNC_BASE_2026
+    ticket_ant = ctx.data_science_ticket_base
+    custo_func_ant = ctx.data_science_custo_func_base
+    primeiro_ano_projetado = anos_list[0]
+    fator_cascata = ctx.fator_cascata_ticket_data_science()
 
     for ano in anos_list:
         n_funcionarios = (
             headcount_por_ano[ano]
             if headcount_por_ano is not None and ano in headcount_por_ano
-            else N_FUNCIONARIOS_DS[ano]
+            else ctx.headcount_ds[int(ano)]
         )
         oc = (
             float(ociosidade_por_ano[ano])
             if ociosidade_por_ano is not None and ano in ociosidade_por_ano
-            else OCIOSIDADE
+            else ctx.data_science_ociosidade_padrao
         )
         oc_eff = min(max(oc, 0.0), 0.999)
-        horas_alocadas = n_funcionarios * HORAS_MES * MESES_ANO * (1.0 - oc_eff)
-        capacidade_projetos = horas_alocadas / HORAS_POR_PROJETO
-        total_projetos = total_projetos_de_capacidade(n_funcionarios, oc)
+        horas_alocadas = n_funcionarios * pr.horas_mes * pr.meses_ano * (1.0 - oc_eff)
+        capacidade_projetos = horas_alocadas / pr.horas_por_projeto
+        total_projetos = total_projetos_de_capacidade(n_funcionarios, oc, params=pr)
 
-        if ano == 2026:
+        if ano == primeiro_ano_projetado:
             ticket_medio = ticket_ant
             inflacao_fator_cascata = 0.0
         else:
-            ticket_medio = ticket_ant * FATOR_CASCATA_TICKET
-            inflacao_fator_cascata = FATOR_CASCATA_TICKET - 1.0
+            ticket_medio = ticket_ant * fator_cascata
+            inflacao_fator_cascata = fator_cascata - 1.0
 
         faturamento_bruto = total_projetos * ticket_medio
         impostos_sv = faturamento_bruto * ALIQUOTA_ISV
         receita_liquida = faturamento_bruto - impostos_sv
 
-        incentivos = receita_liquida * RATIO_INCENTIVOS_PCT_RL
+        incentivos = receita_liquida * pr.ratio_incentivos_pct_rl
 
-        inflacao_ano = INFLACAO_FOCUS[ano]
-        if ano == 2026:
+        inflacao_ano = ctx.inflacao_focus[int(ano)]
+        if ano == primeiro_ano_projetado:
             custo_por_func = custo_func_ant
         else:
-            custo_por_func = custo_func_ant * (1.0 + inflacao_ano + 0.01)
+            custo_por_func = custo_func_ant * (1.0 + inflacao_ano + pr.custo_func_grau_livre_adicional)
         gastos_pessoal = n_funcionarios * custo_por_func
 
-        outras_desp_diretas = receita_liquida * RATIO_OUTRAS_DIR_PCT_RL
+        outras_desp_diretas = receita_liquida * pr.ratio_outras_dir_pct_rl
 
         mc1 = receita_liquida - incentivos - gastos_pessoal - outras_desp_diretas
         mc1_pct_rl = mc1 / receita_liquida if receita_liquida else math.nan
 
-        remuneracao_socios = mc1 * RATIO_REM_SOCIOS_PCT_MC1
+        remuneracao_socios = mc1 * pr.ratio_rem_socios_pct_mc1
         mc2 = mc1 - remuneracao_socios
         mc2_pct_rl = mc2 / receita_liquida if receita_liquida else math.nan
 
-        custo_proprio_adm = receita_liquida * RATIO_OUTRAS_ADM_PCT_RL
+        custo_proprio_adm = receita_liquida * pr.ratio_outras_adm_pct_rl
         rateio_adm = 0.0
         honorarios_adm = 0.0
         outras_desp_adm = custo_proprio_adm + rateio_adm + honorarios_adm
@@ -197,10 +201,9 @@ def projetar_dre_data_science(
 
 
 def projetar_e_salvar_data_science(
-    anos: Iterable[int] = (2026, 2027, 2028, 2029, 2030),
+    anos: Iterable[int] | None = None,
     bu: str = "DATA SCIENCE",
 ):
-    """Grava `projecoes/projecao_data_science.csv`."""
     df = projetar_dre_data_science(anos=anos, bu=bu)
     return salvar_projecao_csv(df, nome_arquivo="projecao_data_science.csv")
 

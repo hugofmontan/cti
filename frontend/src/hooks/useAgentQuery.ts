@@ -7,7 +7,7 @@ interface UseAgentQueryReturn {
   loading: boolean
   error: string | null
   lastResponse: AgentQueryResponse | null
-  ask: (question: string, premissas: Premissas | null) => Promise<void>
+  ask: (question: string, premissas: Premissas | null, dissertativeMode: boolean) => Promise<void>
 }
 
 export function useAgentQuery(): UseAgentQueryReturn {
@@ -17,7 +17,7 @@ export function useAgentQuery(): UseAgentQueryReturn {
   const [lastResponse, setLastResponse] = useState<AgentQueryResponse | null>(null)
   const messagesRef = useRef<AgentMessage[]>([])
 
-  const ask = useCallback(async (question: string, premissas: Premissas | null) => {
+  const ask = useCallback(async (question: string, premissas: Premissas | null, dissertativeMode: boolean) => {
     const trimmed = question.trim()
     if (!trimmed) return
 
@@ -39,6 +39,7 @@ export function useAgentQuery(): UseAgentQueryReturn {
           premissas,
           history: historyForApi,
           locale: 'pt-BR',
+          dissertative_mode: dissertativeMode,
         }),
       })
 
@@ -54,10 +55,12 @@ export function useAgentQuery(): UseAgentQueryReturn {
         content: data.answer_markdown,
         artifacts: data.artifacts?.length ? data.artifacts : undefined,
         warnings: data.warnings?.length ? data.warnings : undefined,
+        dataLineage: data.data_lineage ?? undefined,
         responseSource: data.response_source,
         intent: data.intent ?? undefined,
         scenarioId: data.scenario_id ?? undefined,
         validationRepaired: data.validation_repaired,
+        dissertativeMode,
       }
       messagesRef.current = [...messagesRef.current, assistantMessage]
       setMessages([...messagesRef.current])

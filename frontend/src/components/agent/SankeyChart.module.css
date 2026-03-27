@@ -1,0 +1,62 @@
+.container {
+  position: relative;
+  width: 100%;
+}
+
+.title {
+  margin-bottom: var(--spacing-2);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-neutral-800);
+}
+
+.subtitle {
+  margin-bottom: var(--spacing-3);
+  font-size: var(--font-size-xs);
+  color: var(--color-neutral-500);
+}
+
+.svgWrap {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.svg {
+  display: block;
+}
+
+.tooltip {
+  position: absolute;
+  pointer-events: none;
+  padding: var(--spacing-2) var(--spacing-3);
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  font-size: var(--font-size-xs);
+  font-family: var(--font-family-sans);
+  color: var(--color-neutral-800);
+  z-index: 10;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.tooltipVisible {
+  opacity: 1;
+}
+
+.tooltipLabel {
+  font-weight: var(--font-weight-semibold);
+  margin-bottom: 2px;
+}
+
+.tooltipValue {
+  font-family: var(--font-family-mono);
+}
+
+.tooltipPct {
+  color: var(--color-neutral-500);
+  margin-left: 6px;
+}

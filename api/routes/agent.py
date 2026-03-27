@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 @router.post("/query", response_model=AgentQueryResponse)
-def post_agent_query(payload: AgentQueryPayload, request: Request) -> AgentQueryResponse:
+async def post_agent_query(payload: AgentQueryPayload, request: Request) -> AgentQueryResponse:
     settings = get_settings()
     print(
         "[agent-debug] pergunta_recebida",
@@ -48,7 +48,12 @@ def post_agent_query(payload: AgentQueryPayload, request: Request) -> AgentQuery
     history = [item.model_dump() for item in payload.history]
     started = time.perf_counter()
     try:
-        response = run_agent_query(payload.question, payload.premissas, history)
+        response = await run_agent_query(
+            payload.question,
+            payload.premissas,
+            history,
+            dissertative_mode=payload.dissertative_mode,
+        )
         elapsed_ms = round((time.perf_counter() - started) * 1000, 1)
         print(
             "[agent-debug] resposta_enviada",
@@ -58,14 +63,15 @@ def post_agent_query(payload: AgentQueryPayload, request: Request) -> AgentQuery
                 "confidence": response.confidence,
                 "artifacts": len(response.artifacts),
                 "warnings": len(response.warnings),
+                "tools_executed": response.tools_executed,
             },
         )
         logger.info(
-            "agent_query success intent=%s artifacts=%s latency_ms=%s question_len=%s",
-            "auto",
+            "agent_query success artifacts=%s latency_ms=%s question_len=%s tools=%s",
             len(response.artifacts),
             elapsed_ms,
             len(payload.question),
+            response.tools_executed,
         )
         return response
     except ValueError as exc:

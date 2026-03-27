@@ -1,6 +1,6 @@
 import type { Premissas } from '../../types'
 import { Panel } from '../ui/Panel'
-import { Input } from '../ui/Input'
+import { PercentInput } from '../ui/PercentInput'
 import styles from './PremissasForm.module.css'
 
 interface PremissasRenovacaoProps {
@@ -17,24 +17,22 @@ export function PremissasRenovacao({
   return (
     <Panel title="Renovacao - Spread Real e Churn" defaultOpen={false}>
       <div className={styles.row2}>
-        <Input
+        <PercentInput
           label="Spread Real (%)"
-          type="number"
-          step={0.1}
+          rawValue={premissas.renovacao.spread_real}
+          onChange={onSpreadChange}
           min={-10}
           max={10}
-          value={Number((premissas.renovacao.spread_real * 100).toFixed(2))}
-          onChange={(e) => onSpreadChange(Number(e.target.value) / 100)}
+          step={0.1}
           hint="Ex: 2 = 2 p.p. alem da inflacao"
         />
-        <Input
+        <PercentInput
           label="Churn Anual (%)"
-          type="number"
-          step={0.1}
+          rawValue={premissas.renovacao.churn}
+          onChange={onChurnChange}
           min={0}
           max={99}
-          value={Number((premissas.renovacao.churn * 100).toFixed(2))}
-          onChange={(e) => onChurnChange(Number(e.target.value) / 100)}
+          step={0.1}
           hint="Taxa de churn (0-1) aplicada ao FB"
         />
       </div>

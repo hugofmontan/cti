@@ -2,31 +2,36 @@
 Projeção DRE Renovação (2026–2030) — plano_implementacao_renovacao.md
 """
 
+from __future__ import annotations
+
 import math
 from typing import Iterable
 
 import numpy as np
 import pandas as pd
 
-from .shared import ALIQUOTA_ISV, INFLACAO_FOCUS, _validar_anos, salvar_projecao_csv
+from .context import SimulationContext, default_simulation_context
+from .premissas.renovacao_params import RenovacaoProjectionParams, default_renovacao_projection_params
+from .shared import ALIQUOTA_ISV, salvar_projecao_csv, sort_years_non_empty
 
-FB_RENOVACAO_2025 = 3_385_238.39
-CUSTO_FUNC_RENOVACAO_2025 = 305_489.82 / 3.0
-N_FUNC_RENOVACAO = 3
-SPREAD_REAJUSTE_RENOVACAO = 0.02
-RATIO_REM_MC1_RENOVACAO = 0.065
-RATIO_OUTRAS_ADM_PCT_RL_RENOVACAO = (
-    (20_175.45 / 1_712_222.97 + 20_606.90 / 1_991_988.59 + 16_131.42 / 2_777_019.53) / 3.0
-)
-HONORARIOS_RENOVACAO_JANELA_INICIAL = [64_500.0, 66_000.0, 66_000.0]
+_p = default_renovacao_projection_params()
+FB_RENOVACAO_2025 = _p.fb_renovacao_2025
+CUSTO_FUNC_RENOVACAO_2025 = _p.custo_func_renovacao_2025
+N_FUNC_RENOVACAO = _p.n_func_renovacao
+SPREAD_REAJUSTE_RENOVACAO = _p.spread_reajuste_default
+RATIO_REM_MC1_RENOVACAO = _p.ratio_rem_mc1_renovacao
+RATIO_OUTRAS_ADM_PCT_RL_RENOVACAO = _p.ratio_outras_adm_pct_rl_renovacao
+HONORARIOS_RENOVACAO_JANELA_INICIAL = list(_p.honorarios_janela_inicial)
 
 
 def projetar_dre_renovacao(
-    anos: Iterable[int] = (2026, 2027, 2028, 2029, 2030),
+    ctx: SimulationContext | None = None,
+    anos: Iterable[int] | None = None,
     bu: str = "RENOVAÇÃO",
     *,
     spread_real: float | None = None,
     churn: float = 0.0,
+    params: RenovacaoProjectionParams | None = None,
 ) -> pd.DataFrame:
     """
     Fator 1 + inflação + spread real (soma), custo/func com inflação + 1% real,
@@ -35,25 +40,28 @@ def projetar_dre_renovacao(
     Churn: taxa anual de perda de receita (0–1). Aplica-se ao FB após o reajuste:
     ``faturamento_bruto = fb_ant * fator_reajuste * (1 - churn)``.
     """
-    anos_list = _validar_anos(anos)
+    pr = params if params is not None else default_renovacao_projection_params()
+    ctx = ctx if ctx is not None else default_simulation_context()
+    anos_list = sort_years_non_empty(anos or ctx.year_config.projected_years)
     resultados: list[dict] = []
 
-    spread = SPREAD_REAJUSTE_RENOVACAO if spread_real is None else spread_real
+    spread = pr.spread_reajuste_default if spread_real is None else spread_real
 
-    fb_ant = FB_RENOVACAO_2025
-    custo_func_ant = CUSTO_FUNC_RENOVACAO_2025
-    janela_hon: list[float] = list(HONORARIOS_RENOVACAO_JANELA_INICIAL)
+    base = ctx.base_values
+    fb_ant = base.fb_renovacao_base
+    custo_func_ant = base.custo_func_renovacao_base
+    janela_hon: list[float] = list(pr.honorarios_janela_inicial)
 
     for ano in anos_list:
-        inflacao = INFLACAO_FOCUS[ano]
+        inflacao = ctx.inflacao_focus[int(ano)]
         fator_reajuste = 1.0 + inflacao + spread
 
         faturamento_bruto = fb_ant * fator_reajuste * (1.0 - churn)
         impostos_sv = faturamento_bruto * ALIQUOTA_ISV
         receita_liquida = faturamento_bruto - impostos_sv
 
-        custo_por_func = custo_func_ant * (1.0 + inflacao + 0.01)
-        gastos_pessoal = N_FUNC_RENOVACAO * custo_por_func
+        custo_por_func = custo_func_ant * (1.0 + inflacao + pr.custo_func_grau_livre_adicional)
+        gastos_pessoal = pr.n_func_renovacao * custo_por_func
 
         incentivos = 0.0
         outras_desp_diretas = 0.0
@@ -61,12 +69,12 @@ def projetar_dre_renovacao(
         mc1 = receita_liquida - incentivos - gastos_pessoal - outras_desp_diretas
         mc1_pct_rl = mc1 / receita_liquida if receita_liquida else math.nan
 
-        remuneracao_socios = mc1 * RATIO_REM_MC1_RENOVACAO
+        remuneracao_socios = mc1 * pr.ratio_rem_mc1_renovacao
 
         mc2 = mc1 - remuneracao_socios
         mc2_pct_rl = mc2 / receita_liquida if receita_liquida else math.nan
 
-        custo_proprio_adm = receita_liquida * RATIO_OUTRAS_ADM_PCT_RL_RENOVACAO
+        custo_proprio_adm = receita_liquida * pr.ratio_outras_adm_pct_rl_renovacao
         rateio_adm = 0.0
 
         honorarios_adm = float(np.mean(janela_hon))
@@ -85,7 +93,7 @@ def projetar_dre_renovacao(
             {
                 "bu": bu,
                 "ano": ano,
-                "n_funcionarios": N_FUNC_RENOVACAO,
+                "n_funcionarios": pr.n_func_renovacao,
                 "inflacao_focus": inflacao,
                 "fator_reajuste": fator_reajuste,
                 "spread_real": spread,
@@ -156,7 +164,7 @@ def projetar_dre_renovacao(
 
 
 def projetar_e_salvar_renovacao(
-    anos: Iterable[int] = (2026, 2027, 2028, 2029, 2030),
+    anos: Iterable[int] | None = None,
     bu: str = "RENOVAÇÃO",
 ):
     """Grava `projecoes/projecao_renovacao.csv` (mesmo diretório de `fopm.py`)."""

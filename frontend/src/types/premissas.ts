@@ -1,4 +1,4 @@
-export type YearKey = '2026' | '2027' | '2028' | '2029' | '2030'
+export type YearKey = `${number}`
 
 export interface FOPMPremissas {
   headcount_por_ano: Record<YearKey, number>
@@ -30,6 +30,8 @@ export interface DCFPremissas {
 }
 
 export interface Premissas {
+  inflacao_focus_por_ano: Record<YearKey, number>
+  selic_focus_por_ano: Record<YearKey, number>
   fopm: FOPMPremissas
   renovacao: RenovacaoPremissas
   ams: AMSPremissas

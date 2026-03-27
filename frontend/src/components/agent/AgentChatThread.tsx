@@ -39,7 +39,11 @@ export function AgentChatThread({ messages, loading }: AgentChatThreadProps) {
           </div>
           <div className={styles.bubbleWrap}>
             <div
-              className={clsx(styles.bubble, message.role === 'user' ? styles.bubbleUser : styles.bubbleAssistant)}
+              className={clsx(
+                styles.bubble,
+                message.role === 'user' ? styles.bubbleUser : styles.bubbleAssistant,
+                message.role === 'assistant' && message.dissertativeMode ? styles.bubbleAssistantWide : null,
+              )}
             >
               {message.role === 'user' ? (
                 <p className={styles.userText}>{message.content}</p>
@@ -59,14 +63,23 @@ export function AgentChatThread({ messages, loading }: AgentChatThreadProps) {
                 <AgentArtifactRenderer artifacts={message.artifacts} />
               </div>
             ) : null}
-            {message.role === 'assistant' && message.responseSource ? (
-              <p className={styles.trace} title="Origem da resposta e cenário">
-                {message.responseSource === 'deterministic' && 'Dados do modelo'}
-                {message.responseSource === 'openai' && 'LLM + contexto'}
-                {message.responseSource === 'fallback' && 'Fallback'}
-                {message.intent ? ` · ${message.intent}` : ''}
-                {message.scenarioId ? ` · cenário ${message.scenarioId}` : ''}
-              </p>
+            {message.role === 'assistant' && message.dataLineage && message.dataLineage.length > 0 ? (
+              <details style={{ marginTop: 'var(--spacing-2)' }}>
+                <summary style={{ cursor: 'pointer', color: 'var(--color-neutral-600)', fontWeight: 600 }}>
+                  Rastreabilidade (data lineage)
+                </summary>
+                <ul style={{ margin: 'var(--spacing-2) 0 0', paddingLeft: '18px', color: 'var(--color-neutral-700)' }}>
+                  {message.dataLineage.map((item, i) => (
+                    <li key={`${item.label}-${i}`} style={{ marginBottom: 6 }}>
+                      <span style={{ fontWeight: 600 }}>{item.label}:</span> {item.value}
+                      <div style={{ fontSize: '0.8rem', color: 'var(--color-neutral-500)' }}>
+                        fonte: {item.source}
+                        {item.scenario_id ? ` · cenário ${item.scenario_id}` : ''}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </details>
             ) : null}
           </div>
         </div>

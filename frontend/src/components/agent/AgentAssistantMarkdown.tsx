@@ -1,5 +1,6 @@
 import ReactMarkdown from 'react-markdown'
 import remarkMath from 'remark-math'
+import remarkGfm from 'remark-gfm'
 import rehypeKatex from 'rehype-katex'
 import 'katex/dist/katex.min.css'
 import styles from './AgentAssistantMarkdown.module.css'
@@ -16,7 +17,10 @@ export function AgentAssistantMarkdown({ content }: AgentAssistantMarkdownProps)
   return (
     <div className={styles.markdown}>
       <ReactMarkdown
-        remarkPlugins={[[remarkMath, { singleDollarTextMath: false }]]}
+        remarkPlugins={[
+          remarkGfm,
+          [remarkMath, { singleDollarTextMath: false }],
+        ]}
         rehypePlugins={[rehypeKatex]}
         components={{
           p: ({ children }) => <p className={styles.p}>{children}</p>,
@@ -24,6 +28,14 @@ export function AgentAssistantMarkdown({ content }: AgentAssistantMarkdownProps)
           ol: ({ children }) => <ol className={styles.ol}>{children}</ol>,
           li: ({ children }) => <li className={styles.li}>{children}</li>,
           strong: ({ children }) => <strong className={styles.strong}>{children}</strong>,
+          table: ({ children }) => (
+            <div className={styles.tableWrapper}>
+              <table className={styles.table}>{children}</table>
+            </div>
+          ),
+          thead: ({ children }) => <thead className={styles.thead}>{children}</thead>,
+          th: ({ children }) => <th className={styles.th}>{children}</th>,
+          td: ({ children }) => <td className={styles.td}>{children}</td>,
           code: ({ children, className }) => {
             const isBlock = Boolean(className)
             if (isBlock) {

@@ -1,4 +1,4 @@
-import type { ChangeEvent } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import styles from './SliderValueWithInput.module.css'
 
 interface SliderValueWithInputProps {
@@ -49,7 +49,6 @@ export function SliderValueWithInput({
   const inputScaleResolved = inputScale ?? scale
 
   const rawToDisplay = (raw: number) => raw * scale
-  const displayToRaw = (display: number) => display / inputScaleResolved
 
   const clampedRaw = Math.min(max, Math.max(min, value))
   const displayValue = rawToDisplay(clampedRaw)
@@ -61,17 +60,56 @@ export function SliderValueWithInput({
 
   const inputDisplayMin = min * inputScaleResolved
   const inputDisplayMax = max * inputScaleResolved
+  const numberStepResolved = inputStep ?? step * inputScaleResolved
 
-  const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
-    if (e.target.value.trim() === '') return
-    const typed = Number(e.target.value)
-    if (!Number.isFinite(typed)) return
-    const nextRaw = displayToRaw(typed)
+  // --- Draft state for the number input (commit on blur) ---
+  const [draft, setDraft] = useState<string>(String(displayValueRounded))
+  const [editing, setEditing] = useState(false)
+
+  useEffect(() => {
+    if (!editing) {
+      setDraft(String(displayValueRounded))
+    }
+  }, [displayValueRounded, editing])
+
+  const commitDraft = useCallback(() => {
+    setEditing(false)
+    const trimmed = draft.trim()
+    if (trimmed === '' || !Number.isFinite(Number(trimmed))) return
+    const typed = Number(trimmed)
+    const nextRaw = typed / inputScaleResolved
     const nextClamped = Math.min(max, Math.max(min, nextRaw))
     onChange(nextClamped)
-  }
+  }, [draft, inputScaleResolved, max, min, onChange])
 
-  const numberStepResolved = inputStep ?? step * inputScaleResolved
+  // --- Slider local state (commit on pointerup) ---
+  const [sliderLocal, setSliderLocal] = useState(clampedRaw)
+  const dragging = useRef(false)
+
+  useEffect(() => {
+    if (!dragging.current) {
+      setSliderLocal(clampedRaw)
+    }
+  }, [clampedRaw])
+
+  const handleSliderPointerDown = useCallback(() => {
+    dragging.current = true
+  }, [])
+
+  const handleSliderChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = Number(e.target.value)
+    setSliderLocal(v)
+    if (!dragging.current) {
+      onChange(v)
+    }
+  }, [onChange])
+
+  const handleSliderPointerUp = useCallback(() => {
+    if (dragging.current) {
+      dragging.current = false
+      onChange(sliderLocal)
+    }
+  }, [onChange, sliderLocal])
 
   return (
     <div className={styles.container}>
@@ -88,19 +126,26 @@ export function SliderValueWithInput({
         min={min}
         max={max}
         step={step}
-        value={clampedRaw}
-        onChange={(e) => onChange(Number(e.target.value))}
+        value={dragging.current ? sliderLocal : clampedRaw}
+        onPointerDown={handleSliderPointerDown}
+        onChange={handleSliderChange}
+        onPointerUp={handleSliderPointerUp}
+        onPointerCancel={handleSliderPointerUp}
         aria-label={label}
       />
 
       <input
         className={styles.numberInput}
-        type="number"
-        value={displayValueRounded}
+        type="text"
+        inputMode="decimal"
+        value={editing ? draft : String(displayValueRounded)}
         min={inputDisplayMin}
         max={inputDisplayMax}
         step={numberStepResolved}
-        onChange={handleInputChange}
+        onFocus={() => setEditing(true)}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commitDraft}
+        onKeyDown={(e) => { if (e.key === 'Enter') commitDraft() }}
         aria-label={`${label} manual`}
       />
     </div>

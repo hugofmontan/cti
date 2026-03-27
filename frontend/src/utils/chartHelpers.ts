@@ -1,5 +1,5 @@
 import type { DRERow, FluxoRow, SimulateResponse } from '../types'
-import { ALL_DISPLAY_YEARS, BU_KEYS, CHART_COLORS, HISTORICAL_YEAR_END, YEARS } from './constants'
+import { BU_KEYS, CHART_COLORS } from './constants'
 import type { DRERowMerged } from './dreMerge'
 
 export interface FCFFChartData {
@@ -71,14 +71,14 @@ export function transformFCFFData(fluxo: FluxoRow[]): FCFFChartData[] {
  * Transform DRE data for stacked revenue by BU chart
  */
 export function transformRevenueByBUData(
-  dre: Record<string, DRERow[]>
+  dre: Record<string, DRERow[]>,
+  projectedYears: number[],
 ): RevenueByBUChartData[] {
   const result: RevenueByBUChartData[] = []
 
-  for (const year of YEARS) {
-    const yearNum = parseInt(year)
+  for (const yearNum of projectedYears) {
     const dataPoint: RevenueByBUChartData = {
-      ano: year,
+      ano: String(yearNum),
       fopm: 0,
       renovacao: 0,
       ams: 0,
@@ -109,12 +109,11 @@ export function transformRevenueByBUData(
  */
 export function transformRevenueByBUPctData(
   dre: Record<string, DRERow[]>,
+  projectedYears: number[],
 ): RevenueByBUPctChartData[] {
   const result: RevenueByBUPctChartData[] = []
 
-  for (const year of YEARS) {
-    const yearNum = parseInt(year)
-
+  for (const yearNum of projectedYears) {
     const rlByBu: Record<string, number> = {
       fopm: 0,
       renovacao: 0,
@@ -140,7 +139,7 @@ export function transformRevenueByBUPctData(
     const share = (v: number) => (denom === 0 ? 0 : v / denom)
 
     const dataPoint: RevenueByBUPctChartData = {
-      ano: year,
+      ano: String(yearNum),
       fopm: share(rlByBu.fopm),
       renovacao: share(rlByBu.renovacao),
       ams: share(rlByBu.ams),
@@ -179,13 +178,14 @@ export function transformMarginTrendData(
  */
 export function transformMarginTrendDataSplit(
   consolidado: DRERowMerged[],
+  opts: { historicalYearEnd: number },
 ): MarginTrendSplitData[] {
   return consolidado.map((row) => {
     const rl = row.receita_liquida
     const e = _pctLine(row.ebitda, rl)
     const eb = _pctLine(row.ebit, rl)
     const ll = _pctLine(row.lucro_liquido, rl)
-    const isHist = row.ano <= HISTORICAL_YEAR_END
+    const isHist = row.ano <= opts.historicalYearEnd
     return {
       ano: String(row.ano),
       ebitda_pct_h: isHist ? e : null,
@@ -203,11 +203,11 @@ export function transformMarginTrendDataSplit(
  */
 export function transformRevenueByBUDataMerged(
   mergedDre: Record<string, DRERowMerged[]>,
+  allDisplayYears: number[],
 ): RevenueByBUChartData[] {
-  return ALL_DISPLAY_YEARS.map((ys) => {
-    const y = Number(ys)
+  return allDisplayYears.map((y) => {
     const dataPoint: RevenueByBUChartData = {
-      ano: ys,
+      ano: String(y),
       fopm: 0,
       renovacao: 0,
       ams: 0,
@@ -232,10 +232,9 @@ export function transformRevenueByBUDataMerged(
  */
 export function transformRevenueByBUPctDataMerged(
   mergedDre: Record<string, DRERowMerged[]>,
+  allDisplayYears: number[],
 ): RevenueByBUPctChartData[] {
-  return ALL_DISPLAY_YEARS.map((ys) => {
-    const y = Number(ys)
-
+  return allDisplayYears.map((y) => {
     const rlByBu: Record<string, number> = {
       fopm: 0,
       renovacao: 0,
@@ -259,7 +258,7 @@ export function transformRevenueByBUPctDataMerged(
     const share = (v: number) => (denom === 0 ? 0 : v / denom)
 
     return {
-      ano: ys,
+      ano: String(y),
       fopm: share(rlByBu.fopm),
       renovacao: share(rlByBu.renovacao),
       ams: share(rlByBu.ams),
@@ -274,13 +273,15 @@ export function transformRevenueByBUPctDataMerged(
  * Transform DCF data for waterfall chart
  */
 export function transformWaterfallData(
-  dcf: SimulateResponse['dcf']
+  dcf: SimulateResponse['dcf'],
+  projectedYears: number[],
 ): WaterfallChartData[] {
   const data: WaterfallChartData[] = []
 
   // Add VP FCFFs by year
-  for (const year of YEARS) {
-    const vpFcff = dcf.vp_fcff_por_ano[year] || 0
+  for (const year of projectedYears) {
+    const yearKey = String(year)
+    const vpFcff = dcf.vp_fcff_por_ano[yearKey] || 0
     data.push({
       name: `VP FCFF ${year}`,
       value: vpFcff,

@@ -12,9 +12,10 @@ import {
 import type { DRERow } from '../../types'
 import { fmtBRL, fmtMillions } from '../../utils/formatters'
 import { transformRevenueByBUData, transformRevenueByBUDataMerged } from '../../utils/chartHelpers'
-import { BU_NAMES, CHART_COLORS, HISTORICAL_YEAR_END } from '../../utils/constants'
+import { BU_NAMES, CHART_COLORS } from '../../utils/constants'
 import type { DRERowMerged } from '../../utils/dreMerge'
 import { ChartContainer } from './ChartContainer'
+import { useYearConfig } from '../../contexts/YearConfigContext'
 
 interface RevenueByBUChartProps {
   dre: Record<string, DRERow[]>
@@ -23,10 +24,12 @@ interface RevenueByBUChartProps {
 }
 
 export function RevenueByBUChart({ dre, mergedDre }: RevenueByBUChartProps) {
+  const { historicalYearEnd, projectedYears, allDisplayYears } = useYearConfig()
+
   const data =
     mergedDre && Object.keys(mergedDre).length > 0
-      ? transformRevenueByBUDataMerged(mergedDre)
-      : transformRevenueByBUData(dre)
+      ? transformRevenueByBUDataMerged(mergedDre, allDisplayYears)
+      : transformRevenueByBUData(dre, projectedYears)
 
   return (
     <ChartContainer title="Receita Liquida por BU (Empilhado)" height={350}>
@@ -35,7 +38,7 @@ export function RevenueByBUChart({ dre, mergedDre }: RevenueByBUChartProps) {
           <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-light)" />
           {mergedDre ? (
             <ReferenceLine
-              x={String(HISTORICAL_YEAR_END)}
+              x={String(historicalYearEnd)}
               stroke="var(--color-neutral-400)"
               strokeDasharray="4 4"
             />

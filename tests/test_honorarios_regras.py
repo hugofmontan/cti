@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import pytest
 
+from projecao_bus.context import default_simulation_context
 from projecao_bus.administrativa import (
     HONORARIOS_ADM_FIXO,
     HONORARIOS_RATEIO_FIXO,
     projetar_dre_administrativa,
 )
 from projecao_bus.orchestrator import run_simulation
+from projecao_bus.year_config import get_projected_years
 
 
 def test_honorarios_bu_regras_batem_gabarito() -> None:
@@ -37,7 +39,7 @@ def test_honorarios_bu_regras_batem_gabarito() -> None:
 
 
 def test_honorarios_adm_fixos_na_projecao() -> None:
-    df = projetar_dre_administrativa().set_index("ano")
-    for ano in [2026, 2027, 2028, 2029, 2030]:
+    df = projetar_dre_administrativa(default_simulation_context()).set_index("ano")
+    for ano in get_projected_years():
         assert float(df.loc[ano, "honorarios_adm"]) == HONORARIOS_ADM_FIXO
         assert float(df.loc[ano, "honorarios_rateio"]) == HONORARIOS_RATEIO_FIXO

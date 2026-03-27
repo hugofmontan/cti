@@ -1,33 +1,13 @@
-import {
-  ALL_DISPLAY_YEARS,
-  BU_KEYS,
-  BU_NAMES,
-  DRE_DISPLAY_ORDER,
-  DRE_LINE_LABELS,
-  SERIE_HISTORICAL_COLOR,
-  SERIE_PROJECTED_COLOR,
-  HISTORICAL_YEAR_END,
-} from '../../utils/constants'
+import { BU_KEYS, DRE_DISPLAY_ORDER, DRE_LINE_LABELS } from '../../utils/constants'
 import type { DRERowMerged } from '../../utils/dreMerge'
-import { fmtBRL, fmtMillions, fmtPct } from '../../utils/formatters'
+import { getBuLabel } from '../../utils/buLabels'
+import { fmtBRLThousandsAccounting } from '../../utils/formatters'
 import { Tabs } from '../ui/Tabs'
 import { Table } from '../ui/Table'
 import tableStyles from '../ui/Table.module.css'
-import { ChartContainer } from '../charts/ChartContainer'
+import { BuOperationalCharts } from '../charts/BuOperationalCharts'
 import styles from './BUBreakdown.module.css'
-import {
-  Bar,
-  CartesianGrid,
-  ComposedChart,
-  LabelList,
-  Legend,
-  Line,
-  ReferenceLine,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts'
+import { useYearConfig } from '../../contexts/YearConfigContext'
 
 interface BUBreakdownProps {
   /** Série mesclada histórico + projeção por BU. */
@@ -35,26 +15,9 @@ interface BUBreakdownProps {
 }
 
 type TableRow = {
+  key: string
   linha: string
-  [year: string]: string | number
-}
-
-interface BuOperationalPoint {
-  ano: string
-  faturamento_bruto: number
-  n_funcionarios: number
-  ebitda: number
-  margem_ebitda_pct: number
-  margem_ebitda_pct_h: number | null
-  margem_ebitda_pct_p: number | null
-  faturamento_bruto_h: number | null
-  faturamento_bruto_p: number | null
-  n_funcionarios_h: number | null
-  n_funcionarios_p: number | null
-  ebitda_h: number | null
-  ebitda_p: number | null
-  /** Para estilizar barras (opcional futuro) */
-  isHistorical: boolean
+  [year: string]: string | number | null
 }
 
 function getDreValue(row: DRERowMerged, key: string): number | undefined {
@@ -74,88 +37,53 @@ function getDreValue(row: DRERowMerged, key: string): number | undefined {
 }
 
 export function BUBreakdown({ dre }: BUBreakdownProps) {
+  const { historicalYearEnd, allDisplayYears } = useYearConfig()
+
   const knownBuKeys = BU_KEYS as unknown as string[]
   const extraBuKeys = Object.keys(dre).filter((k) => !knownBuKeys.includes(k))
   const tabsBuKeys = [...knownBuKeys, ...extraBuKeys]
-
-  const getBuLabel = (buKey: string) => {
-    const lower = buKey.toLowerCase()
-    if (lower === 'administrativa' || lower.includes('administr')) return 'Administrativa'
-
-    const known = (BU_NAMES as Record<string, string>)[lower] ?? (BU_NAMES as Record<string, string>)[buKey]
-    return known ?? buKey
-  }
+  const highlightRows = ['receita_liquida', 'mc1', 'mc2', 'ebitda', 'ebit', 'lucro_liquido']
 
   const tabs = tabsBuKeys.map((buKey) => {
     const rows = dre[buKey] ?? []
 
-    const chartData: BuOperationalPoint[] = ALL_DISPLAY_YEARS.map((ys) => {
-      const y = Number(ys)
-      const r = rows.find((row) => row.ano === y)
-      const faturamentoBruto =
-        typeof r?.faturamento_bruto === 'number'
-          ? r.faturamento_bruto
-          : typeof r?.receita_bruta === 'number'
-            ? r.receita_bruta
-            : 0
-      const ebitda = typeof r?.ebitda === 'number' ? r.ebitda : 0
-      const receitaLiquida = typeof r?.receita_liquida === 'number' ? r.receita_liquida : 0
-      const margem = receitaLiquida ? ebitda / receitaLiquida : 0
-      const isHistorical = y <= HISTORICAL_YEAR_END
-      const faturamentoBrutoH = isHistorical ? faturamentoBruto : null
-      const faturamentoBrutoP = !isHistorical ? faturamentoBruto : null
-
-      // Algumas BUs podem expor headcount com nomes diferentes (ex.: BU administrativa -> `n_funcionarios_adm`).
-      const nFuncionariosBase =
-        typeof r?.n_funcionarios === 'number'
-          ? r.n_funcionarios
-          : typeof (r as { n_funcionarios_adm?: unknown }).n_funcionarios_adm === 'number'
-            ? (r as { n_funcionarios_adm: number }).n_funcionarios_adm
-            : 0
-
-      const nFuncionariosH = isHistorical ? nFuncionariosBase : null
-      const nFuncionariosP = !isHistorical ? nFuncionariosBase : null
-      const ebitdaH = isHistorical ? ebitda : null
-      const ebitdaP = !isHistorical ? ebitda : null
-      return {
-        ano: ys,
-        faturamento_bruto: faturamentoBruto,
-        n_funcionarios: nFuncionariosBase,
-        ebitda,
-        margem_ebitda_pct: margem,
-        margem_ebitda_pct_h: isHistorical ? margem : null,
-        margem_ebitda_pct_p: !isHistorical ? margem : null,
-        faturamento_bruto_h: faturamentoBrutoH,
-        faturamento_bruto_p: faturamentoBrutoP,
-        n_funcionarios_h: nFuncionariosH,
-        n_funcionarios_p: nFuncionariosP,
-        ebitda_h: ebitdaH,
-        ebitda_p: ebitdaP,
-        isHistorical,
-      }
-    })
-
     const tableData: TableRow[] = DRE_DISPLAY_ORDER.map((key) => {
-      const row: TableRow = { linha: DRE_LINE_LABELS[key] ?? key }
+      const row: TableRow = { key, linha: DRE_LINE_LABELS[key] ?? key }
       for (const yearData of rows) {
         const year = String(yearData.ano)
         const value = getDreValue(yearData, key)
-        row[year] = typeof value === 'number' ? fmtBRL(value) : '—'
+        row[year] = typeof value === 'number' ? value : null
       }
       return row
     })
 
     const columns = [
-      { key: 'linha', header: 'Linha', align: 'left' as const, width: '220px' },
-      ...ALL_DISPLAY_YEARS.map((year) => {
-        const y = Number(year)
-        const isHist = y <= HISTORICAL_YEAR_END
+      {
+        key: 'linha',
+        header: 'Linha',
+        align: 'left' as const,
+        width: '220px',
+        render: (row: TableRow) => <span className={styles.rowLabel}>{row.linha}</span>,
+      },
+      ...allDisplayYears.map((y) => {
+        const isHist = y <= historicalYearEnd
         return {
-          key: year,
-          header: year,
+          key: String(y),
+          header: String(y),
           align: 'right' as const,
           headerClassName: isHist ? tableStyles.colHistoricalHeader : tableStyles.colProjectedHeader,
           cellClassName: isHist ? tableStyles.colHistorical : tableStyles.colProjected,
+          render: (row: TableRow) => {
+            const raw = row[String(y)]
+            const value = typeof raw === 'number' ? raw : null
+            if (value === null) return '—'
+            const className = value < 0 ? styles.negativeValue : styles.numericValue
+            return (
+              <span className={className}>
+                {fmtBRLThousandsAccounting(value, { zeroAsDash: true, decimals: 0 })}
+              </span>
+            )
+          },
         }
       }),
     ]
@@ -169,124 +97,19 @@ export function BUBreakdown({ dre }: BUBreakdownProps) {
             <span className={styles.swatchHist} /> Histórico
             <span className={styles.swatchGap} />
             <span className={styles.swatchProj} /> Projeção
+            <span className={styles.swatchGap} />
+            <strong>R$ mil</strong>
           </p>
-          <Table columns={columns} data={tableData} striped compact />
+          <Table
+            columns={columns}
+            data={tableData}
+            className={styles.dreTable}
+            striped
+            compact
+            highlightRows={(row) => highlightRows.includes(String((row as TableRow).key))}
+          />
 
-          <div className={styles.chartsGrid}>
-            <ChartContainer
-              title={`Evolucao do Faturamento Bruto e Funcionarios — ${getBuLabel(buKey)}`}
-              height={320}
-            >
-              <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-light)" />
-                  <ReferenceLine
-                    x={String(HISTORICAL_YEAR_END)}
-                    stroke="var(--color-neutral-400)"
-                    strokeDasharray="4 4"
-                  />
-                  <XAxis dataKey="ano" />
-                  <YAxis yAxisId="valor" tickFormatter={(v) => fmtMillions(v)} />
-                  <YAxis yAxisId="func" orientation="right" />
-                  <Tooltip
-                    formatter={(value, name) => {
-                      if (name === 'n_funcionarios')
-                        return [Number(value).toFixed(1), 'Funcionarios']
-                      return [fmtBRL(Number(value)), 'Faturamento Bruto']
-                    }}
-                  />
-                  <Legend
-                    formatter={(value) =>
-                      value === 'n_funcionarios'
-                        ? 'Funcionarios'
-                        : value === 'faturamento_bruto_h'
-                          ? 'Faturamento Bruto (Hist.)'
-                          : value === 'faturamento_bruto_p'
-                            ? 'Faturamento Bruto (Proj.)'
-                            : '—'
-                    }
-                  />
-                  <Bar yAxisId="valor" dataKey="faturamento_bruto_h" fill={SERIE_HISTORICAL_COLOR} name="faturamento_bruto_h" />
-                  <Bar yAxisId="valor" dataKey="faturamento_bruto_p" fill={SERIE_PROJECTED_COLOR} name="faturamento_bruto_p" />
-
-                  <Line
-                    yAxisId="func"
-                    type="monotone"
-                    dataKey="n_funcionarios"
-                    stroke="var(--color-warning)"
-                    strokeWidth={2}
-                    dot={{ r: 3 }}
-                    name="n_funcionarios"
-                  >
-                    <LabelList
-                      dataKey="n_funcionarios"
-                      position="top"
-                      formatter={(v) => Number(v).toFixed(1)}
-                      style={{ fill: 'var(--color-warning)', fontSize: 11, fontWeight: 600 }}
-                    />
-                  </Line>
-                </ComposedChart>
-              </ResponsiveContainer>
-            </ChartContainer>
-
-            <ChartContainer title={`EBITDA e Margem EBITDA — ${getBuLabel(buKey)}`} height={320}>
-              <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-light)" />
-                  <ReferenceLine
-                    x={String(HISTORICAL_YEAR_END)}
-                    stroke="var(--color-neutral-400)"
-                    strokeDasharray="4 4"
-                  />
-                  <XAxis dataKey="ano" />
-                  <YAxis yAxisId="valor" tickFormatter={(v) => fmtMillions(v)} />
-                  <YAxis
-                    yAxisId="pct"
-                    orientation="right"
-                    tickFormatter={(v) => `${Math.round(v * 100)}%`}
-                  />
-                  <Tooltip
-                    formatter={(value, name) => {
-                      if (name === 'margem_ebitda_pct_h' || name === 'margem_ebitda_pct_p' || name === 'margem_ebitda_pct')
-                        return [fmtPct(Number(value)), 'Margem EBITDA']
-                      return [fmtBRL(Number(value)), 'EBITDA']
-                    }}
-                  />
-                  <Legend
-                    formatter={(value) => {
-                      if (
-                        value === 'margem_ebitda_pct_h' ||
-                        value === 'margem_ebitda_pct_p' ||
-                        value === 'margem_ebitda_pct'
-                      )
-                        return 'Margem EBITDA'
-                      if (value === 'ebitda_h') return 'EBITDA (Hist.)'
-                      if (value === 'ebitda_p') return 'EBITDA (Proj.)'
-                      return 'EBITDA'
-                    }}
-                  />
-                  <Bar yAxisId="valor" dataKey="ebitda_h" fill={SERIE_HISTORICAL_COLOR} name="ebitda_h" />
-                  <Bar yAxisId="valor" dataKey="ebitda_p" fill={SERIE_PROJECTED_COLOR} name="ebitda_p" />
-                  <Line
-                    yAxisId="pct"
-                    type="monotone"
-                    dataKey="margem_ebitda_pct"
-                    stroke="var(--color-warning)"
-                    strokeWidth={2}
-                    dot={{ r: 3 }}
-                    name="margem_ebitda_pct"
-                  >
-                    <LabelList
-                      dataKey="margem_ebitda_pct"
-                      position="top"
-                      formatter={(v) => fmtPct(Number(v), 1)}
-                      style={{ fill: 'var(--color-warning)', fontSize: 11, fontWeight: 600 }}
-                    />
-                  </Line>
-                </ComposedChart>
-              </ResponsiveContainer>
-            </ChartContainer>
-          </div>
+          <BuOperationalCharts buKey={buKey} rows={rows} />
         </div>
       ),
     }

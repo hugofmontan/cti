@@ -18,7 +18,18 @@
 .actions {
   margin-top: var(--spacing-4);
   display: flex;
+  flex-wrap: wrap;
   gap: var(--spacing-2);
+}
+
+/** Árvore só para captura PDF (fora da tela; mantém layout dos gráficos). */
+.pdfCaptureHost {
+  position: fixed;
+  left: -14000px;
+  top: 0;
+  z-index: -1;
+  pointer-events: none;
+  overflow: visible;
 }
 
 .chartsGrid {

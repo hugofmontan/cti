@@ -1,0 +1,24 @@
+categoria,conta,tipo,2021,2022,2023,2024,2025
+Ativo Circulante,Total Ativo Circulante,subtotal,9844000,13088000,16313000,14833000,9953829
+Ativo Circulante,Caixa e Equivalentes de Caixa,item,4741000,3602000,7749000,5200000,2291962
+Ativo Circulante,Contas a Receber (Clientes),item,4932000,9064000,8317000,9260000,7236159
+Ativo Circulante,Partes Relacionadas,item,0,0,0,0,13863
+Ativo Circulante,Adiantamentos,item,72000,193000,86000,61000,64681
+Ativo Circulante,Impostos a Recuperar,item,87000,215000,159000,292000,321550
+Ativo Circulante,Outros Ativos Circulantes,item,12000,14000,3000,20000,25609
+Ativo Não Circulante,Total Ativo Não Circulante,subtotal,912000,630000,892000,747000,901207
+Ativo Não Circulante,Ativo Fiscal Diferido,item,0,0,0,0,0
+Ativo Não Circulante,Imobilizado e Intangível (Bruto),item,1850000,1890000,2281000,2309000,2445435
+Ativo Não Circulante,Depreciação e Amortização Acumulada,item,-939000,-1260000,-1389000,-1562000,-1561883
+Total do Ativo,Total do Ativo,total,10756000,13718000,17205000,15581000,10855036
+Passivo Circulante,Total Passivo Circulante,subtotal,2206000,2987000,2801000,2911000,3247348
+Passivo Circulante,Contas a Pagar,item,465000,434000,514000,559000,358747
+Passivo Circulante,Fornecedores,item,9000,10000,21000,24000,69783
+Passivo Circulante,Obrigações Trabalhistas e Sociais,item,456000,424000,493000,535000,288964
+Passivo Circulante,Obrigações Fiscais,item,978000,1207000,1258000,1273000,1341319
+Passivo Circulante,Provisões,item,729000,996000,1072000,1111000,1198579
+Passivo Circulante,Outras Obrigações,item,-36000,-350000,-43000,-32000,-10044
+Passivo Não Circulante,Total Passivo Não Circulante,subtotal,152000,251000,138000,127000,109534
+Passivo Não Circulante,Receitas Diferidas,item,152000,251000,138000,127000,109534
+Patrimônio Líquido,Patrimônio Líquido,total,8398000,-10480000,14179000,12478000,7498154
+Total do Passivo e PL,Total do Passivo e PL,total,10756000,-7242000,17118000,15516000,10855036

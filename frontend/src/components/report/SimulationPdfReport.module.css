@@ -1,0 +1,75 @@
+.root {
+  box-sizing: border-box;
+  width: 900px;
+  max-width: 900px;
+  padding: var(--spacing-5);
+  background: #ffffff;
+  color: var(--color-neutral-800);
+  font-family: var(--font-sans, 'Inter', system-ui, sans-serif);
+}
+
+.header {
+  margin-bottom: var(--spacing-6);
+  padding-bottom: var(--spacing-4);
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.title {
+  margin: 0 0 var(--spacing-2);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-neutral-900);
+}
+
+.subtitle {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--color-neutral-600);
+}
+
+.chartBlock {
+  margin-bottom: var(--spacing-6);
+  break-inside: avoid;
+}
+
+.warnings {
+  margin-top: var(--spacing-6);
+  padding: var(--spacing-4);
+  border-radius: var(--radius-md);
+  background: var(--color-warning-bg, #fff8e6);
+  border: 1px solid var(--color-border-light);
+}
+
+.warningsTitle {
+  margin: 0 0 var(--spacing-2);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.warningsList {
+  margin: 0;
+  padding-left: 1.25rem;
+  font-size: 0.8125rem;
+  color: var(--color-neutral-700);
+}
+
+.buPdfSection {
+  margin-top: var(--spacing-2);
+  margin-bottom: var(--spacing-6);
+  padding-top: var(--spacing-4);
+  border-top: 1px solid var(--color-border-light);
+}
+
+.buPdfTitle {
+  margin: 0 0 var(--spacing-2);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-neutral-900);
+}
+
+.buPdfLead {
+  margin: 0 0 var(--spacing-5);
+  font-size: 0.8125rem;
+  color: var(--color-neutral-600);
+  line-height: 1.45;
+}

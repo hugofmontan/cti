@@ -11,16 +11,17 @@ interface AgentPanelProps {
 
 export function AgentPanel({ premissas }: AgentPanelProps) {
   const [question, setQuestion] = useState('')
+  const [dissertativeMode, setDissertativeMode] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const { ask, messages, loading, error } = useAgentQuery()
 
   const onSubmit = useCallback(async () => {
     const q = question.trim()
     if (!q || loading) return
-    await ask(q, premissas)
+    await ask(q, premissas, dissertativeMode)
     setQuestion('')
     textareaRef.current?.focus()
-  }, [question, loading, ask, premissas])
+  }, [question, loading, ask, premissas, dissertativeMode])
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -32,11 +33,25 @@ export function AgentPanel({ premissas }: AgentPanelProps) {
   return (
     <div className={styles.shell} aria-label="Chat com Analista IA">
       <header className={styles.header}>
-        <div>
-          <h2 className={styles.title}>Analista IA</h2>
-          <p className={styles.subtitle}>
-            Pergunte sobre projeções, BUs e valuation. As respostas usam a simulação atual.
-          </p>
+        <div className={styles.headerTop}>
+          <div>
+            <h2 className={styles.title}>Analista IA</h2>
+            <p className={styles.subtitle}>
+              {dissertativeMode
+                ? 'Modo dissertativo ativo: resposta textual com raciocinio aprofundado.'
+                : 'Pergunte sobre projeções, BUs e valuation. As respostas usam a simulação atual.'}
+            </p>
+          </div>
+          <label className={styles.modeToggle}>
+            <input
+              type="checkbox"
+              checked={dissertativeMode}
+              onChange={(e) => setDissertativeMode(e.target.checked)}
+              disabled={loading}
+              aria-label="Ativar modo dissertativo"
+            />
+            <span className={styles.modeToggleText}>Modo Dissertativo</span>
+          </label>
         </div>
       </header>
 

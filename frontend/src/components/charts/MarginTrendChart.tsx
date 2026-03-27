@@ -12,18 +12,20 @@ import {
 } from 'recharts'
 import type { DRERow } from '../../types'
 import { transformMarginTrendDataSplit } from '../../utils/chartHelpers'
-import { HISTORICAL_YEAR_END, SERIE_HISTORICAL_COLOR, SERIE_PROJECTED_COLOR } from '../../utils/constants'
+import { SERIE_HISTORICAL_COLOR, SERIE_PROJECTED_COLOR } from '../../utils/constants'
 import type { DRERowMerged } from '../../utils/dreMerge'
 import { ChartContainer } from './ChartContainer'
+import { useYearConfig } from '../../contexts/YearConfigContext'
 
 interface MarginTrendChartProps {
   consolidado: DRERow[] | DRERowMerged[]
 }
 
 export function MarginTrendChart({ consolidado }: MarginTrendChartProps) {
-  const dataBase = transformMarginTrendDataSplit(consolidado as DRERowMerged[])
-  const anoHist = HISTORICAL_YEAR_END
-  const anoProj = HISTORICAL_YEAR_END + 1
+  const { historicalYearEnd, projectedYearStart } = useYearConfig()
+  const dataBase = transformMarginTrendDataSplit(consolidado as DRERowMerged[], { historicalYearEnd })
+  const anoHist = historicalYearEnd
+  const anoProj = projectedYearStart
 
   // Série auxiliar só para desenhar um “link” entre o último ponto do histórico e o primeiro da projeção.
   const data = dataBase.map((row) => {
@@ -49,7 +51,7 @@ export function MarginTrendChart({ consolidado }: MarginTrendChartProps) {
         <LineChart data={data} margin={{ top: 20, right: 30, left: 10, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-light)" />
           <ReferenceLine
-            x={String(HISTORICAL_YEAR_END)}
+            x={String(historicalYearEnd)}
             stroke="var(--color-neutral-400)"
             strokeDasharray="4 4"
             label={{ value: 'Projeção →', fill: 'var(--color-neutral-500)', fontSize: 11 }}

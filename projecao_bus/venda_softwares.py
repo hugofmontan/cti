@@ -2,57 +2,63 @@
 Projecao DRE Venda de Softwares (2026-2030).
 """
 
+from __future__ import annotations
+
 import math
 from typing import Iterable
 
 import pandas as pd
 
-from .shared import ALIQUOTA_ISV, INFLACAO_FOCUS, _validar_anos, salvar_projecao_csv
+from .context import SimulationContext, default_simulation_context
+from .premissas.venda_sw_params import VendaSoftwaresProjectionParams, default_venda_softwares_projection_params
+from .shared import ALIQUOTA_ISV, salvar_projecao_csv, sort_years_non_empty
 
-# Premissas fixas validadas no plano de implementacao.
-FB_VENDA_SOFTWARES_2025 = 7_722_610.43
-N_FUNC_VENDA_SOFTWARES = 1
-FATOR_CRESCIMENTO_REAL = 0.045
-CUSTO_FUNC_2025 = 169_393.04
-RATIO_INCENTIVOS_PCT_RL = (
-    (40_771.81 / 2_645_872.52 + 157_306.64 / 5_002_292.92 + 168_010.36 / 6_353_758.49)
-    / 3.0
-)
-RATIO_OUTRAS_DIR_PCT_RL = 1_172_937.78 / 6_353_758.49
-HONORARIOS_ADM_FIXO = (322_500.0 + 330_000.0 + 330_000.0) / 3.0
+_pv = default_venda_softwares_projection_params()
+FB_VENDA_SOFTWARES_2025 = _pv.fb_venda_softwares_2025
+N_FUNC_VENDA_SOFTWARES = _pv.n_func_venda_softwares
+FATOR_CRESCIMENTO_REAL = _pv.fator_crescimento_real
+CUSTO_FUNC_2025 = _pv.custo_func_2025
+RATIO_INCENTIVOS_PCT_RL = _pv.ratio_incentivos_pct_rl
+RATIO_OUTRAS_DIR_PCT_RL = _pv.ratio_outras_dir_pct_rl
+HONORARIOS_ADM_FIXO = _pv.honorarios_adm_fixo
 
 
 def projetar_dre_venda_softwares(
-    anos: Iterable[int] = (2026, 2027, 2028, 2029, 2030),
+    ctx: SimulationContext | None = None,
+    anos: Iterable[int] | None = None,
     bu: str = "VENDA SOFTWARES",
     *,
     fator_crescimento_real: float | None = None,
+    params: VendaSoftwaresProjectionParams | None = None,
 ) -> pd.DataFrame:
     """
-    Projeta a DRE da BU Venda de Softwares de 2026 a 2030.
+    Projeta a DRE da BU Venda de Softwares no horizonte configurado.
     """
-    anos_list = _validar_anos(anos)
+    pr = params if params is not None else default_venda_softwares_projection_params()
+    ctx = ctx if ctx is not None else default_simulation_context()
+    anos_list = sort_years_non_empty(anos or ctx.year_config.projected_years)
     resultados: list[dict] = []
 
-    fcr = FATOR_CRESCIMENTO_REAL if fator_crescimento_real is None else fator_crescimento_real
+    fcr = pr.fator_crescimento_real if fator_crescimento_real is None else fator_crescimento_real
 
-    fb_ant = FB_VENDA_SOFTWARES_2025
-    custo_func_ant = CUSTO_FUNC_2025
+    base = ctx.base_values
+    fb_ant = base.fb_venda_sw_base
+    custo_func_ant = base.custo_func_venda_sw_base
 
     for ano in anos_list:
-        inflacao = INFLACAO_FOCUS[ano]
+        inflacao = ctx.inflacao_focus[int(ano)]
         fator_nominal = 1.0 + fcr + inflacao
 
         faturamento_bruto = fb_ant * fator_nominal
         impostos_sv = faturamento_bruto * ALIQUOTA_ISV
         receita_liquida = faturamento_bruto - impostos_sv
 
-        incentivos = receita_liquida * RATIO_INCENTIVOS_PCT_RL
+        incentivos = receita_liquida * pr.ratio_incentivos_pct_rl
 
-        custo_por_func = custo_func_ant * (1.0 + inflacao + 0.01)
-        gastos_pessoal = N_FUNC_VENDA_SOFTWARES * custo_por_func
+        custo_por_func = custo_func_ant * (1.0 + inflacao + pr.custo_func_grau_livre_adicional)
+        gastos_pessoal = pr.n_func_venda_softwares * custo_por_func
 
-        outras_desp_diretas = receita_liquida * RATIO_OUTRAS_DIR_PCT_RL
+        outras_desp_diretas = receita_liquida * pr.ratio_outras_dir_pct_rl
 
         mc1 = receita_liquida - incentivos - gastos_pessoal - outras_desp_diretas
         mc1_pct_rl = mc1 / receita_liquida if receita_liquida else math.nan
@@ -63,7 +69,7 @@ def projetar_dre_venda_softwares(
 
         custo_proprio_adm = 0.0
         rateio_adm = 0.0
-        honorarios_adm = HONORARIOS_ADM_FIXO
+        honorarios_adm = pr.honorarios_adm_fixo
         outras_desp_adm = custo_proprio_adm + rateio_adm + honorarios_adm
 
         ebitda = mc2 - outras_desp_adm
@@ -78,7 +84,7 @@ def projetar_dre_venda_softwares(
             {
                 "bu": bu,
                 "ano": ano,
-                "n_funcionarios": N_FUNC_VENDA_SOFTWARES,
+                "n_funcionarios": pr.n_func_venda_softwares,
                 "inflacao_focus": inflacao,
                 "fator_nominal": fator_nominal,
                 "custo_por_func": custo_por_func,
@@ -143,7 +149,7 @@ def projetar_dre_venda_softwares(
 
 
 def projetar_e_salvar_venda_softwares(
-    anos: Iterable[int] = (2026, 2027, 2028, 2029, 2030),
+    anos: Iterable[int] | None = None,
     bu: str = "VENDA SOFTWARES",
 ):
     """Grava `projecoes/projecao_venda_softwares.csv`."""

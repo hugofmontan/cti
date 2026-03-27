@@ -2,21 +2,25 @@
 
 from __future__ import annotations
 
+from ..year_config import get_projected_years
+
 # --- Balanço / NCG ---
 PMCR_DIAS = 40
 PMIP_DIAS = 30
 DIAS_ANO = 360
 
-RATIO_FORNECEDORES = 0.004961
-RATIO_OBRIG_TRABALHISTAS = 0.038584
-RATIO_PROVISOES = 0.080117
+RATIO_FORNECEDORES = 0.00439476386325896
+# Rácio usado exclusivamente na série `default_custos_excl_pessoal_gabarito` (premissas.defaults).
+RATIO_FORNECEDORES_CUSTOS_EXCL_GABARITO = 0.004961
+RATIO_OBRIG_TRABALHISTAS = 0.0354456683379581
+RATIO_PROVISOES = 0.0801166034199223
 
-ADIANTAMENTOS = 116_400.0
-IMPOSTOS_RECUPERAR = 286_600.0
-OUTROS_AC = 13_600.0
+ADIANTAMENTOS = 95_336.2
+IMPOSTOS_RECUPERAR = 214_910.0
+OUTROS_AC = 14_921.8
 PARTES_RELACIONADAS = 0.0
-OUTRAS_OBRIGACOES = -114_600.0
-RECEITAS_DIFERIDAS = 217_600.0
+OUTRAS_OBRIGACOES = -94_208.8
+RECEITAS_DIFERIDAS = 155_506.8
 
 # CAPEX de expansão: R$ 15.000 / funcionário novo (base nominal).
 # O reajuste ano a ano é ∏(1 + inflação Focus[j], j=2026..ano) — ver `dcf/bp.py`.
@@ -24,8 +28,8 @@ CAPEX_BASE_POR_FUNC_NOVO = 15_000.0
 TAXA_DEPRECIACAO_CAPEX = 0.20
 ANOS_DEPRECIACAO_CAPEX = 5
 
-IMOBILIZADO_BASE_2025 = 2_491_000.0
-DEPR_ACUM_BASE_2025 = -1_663_000.0
+IMOBILIZADO_BASE_2025 = 2_445_435.0
+DEPR_ACUM_BASE_2025 = -1_561_883.0
 
 NCG_BASE_2025 = 4_514_000.0
 
@@ -33,28 +37,11 @@ NCG_BASE_2025 = 4_514_000.0
 AC_OP_2025 = 7_477_000.0
 PC_OP_2025 = 2_963_000.0
 
-# Custos excl. pessoal alinhados ao gabarito Fornecedores (Fornecedores / ratio)
-# Fonte: planilha (L12+L23+outras do CONS.FORMATO PARCEIRO); aqui usa valores reversos do gabarito BP.
-CUSTOS_EXCL_PESSOAL_GABARITO: dict[int, float] = {
-    2026: 38_456 / RATIO_FORNECEDORES,
-    2027: 46_180 / RATIO_FORNECEDORES,
-    2028: 58_476 / RATIO_FORNECEDORES,
-    2029: 63_351 / RATIO_FORNECEDORES,
-    2030: 68_767 / RATIO_FORNECEDORES,
-}
-
-# Gastos com pessoal não alocado (consolidado_original.csv, linha 23, colunas 2026–2030)
-PESSOAL_NAO_ALOCADO_ADM: dict[int, float] = {
-    2026: 1_715_347.35,
-    2027: 1_799_279.13,
-    2028: 1_840_241.44,
-    2029: 1_920_439.47,
-    2030: 1_949_520.41,
-}
+# Séries gabarito → use `SimulationContext` / `premissas.defaults` (evita estado global).
 
 # --- Fluxo / DCF ---
-CAIXA_BASE_2025 = 8_018_000.0
-PAYOUT_DIVIDENDOS = 0.50
+CAIXA_BASE_2025 = 2_291_962.0
+MESES_RESERVA_CAIXA = 4
 
 WACC_FIXO = 0.1712411693119031
 G_PERPETUIDADE = 0.035
@@ -79,17 +66,6 @@ BETAS_DESALAVANCADOS: dict[str, float] = {
     "data_science": 1.106113,
 }
 
-# Beta ponderado por faturamento (gabarito plano, 2025–2030)
-BETA_PONDERADO_GABARITO: dict[int, float] = {
-    2025: 0.9725,
-    2026: 0.9716,
-    2027: 0.9751,
-    2028: 0.9784,
-    2029: 0.9814,
-    2030: 0.9869,
-}
-
-ANOS_PROJECAO = (2026, 2027, 2028, 2029, 2030)
-
-# Funcionários novos 2026 (gabarito BP) — base 2025 = Total_2026 − este valor
-FUNC_NOVOS_2026_GABARITO = 26.019
+def get_anos_projecao() -> tuple[int, ...]:
+    """Anos projetados ativos (dinamico)."""
+    return get_projected_years()

@@ -2,6 +2,7 @@ export type { YearKey, Premissas } from './premissas'
 export type {
   SimulateResponse,
   DRERow,
+  BPRow,
   FluxoRow,
   DCFResult,
   Multiplos,
@@ -14,4 +15,8 @@ export type {
   AgentChartArtifact,
   AgentTableArtifact,
   AgentKPIArtifact,
+  AgentKPIPanelArtifact,
+  AgentScenarioComparisonArtifact,
+  AgentSensitivityMatrixArtifact,
+  AgentSankeyArtifact,
 } from './agent'

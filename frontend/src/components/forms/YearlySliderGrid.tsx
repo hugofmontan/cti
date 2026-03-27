@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { YearKey } from '../../types'
-import { YEARS } from '../../utils/constants'
 import styles from './YearlySliderGrid.module.css'
+import { useYearConfig } from '../../contexts/YearConfigContext'
 
 function stepToDecimals(step: number) {
   const s = String(step)
@@ -37,24 +37,67 @@ function YearlySliderItem({
   numberInputScale,
   numberInputStep,
 }: YearlySliderItemProps) {
-  const displayForRange = raw
-  const display = formatValue ? formatValue(displayForRange) : String(displayForRange)
+  const display = formatValue ? formatValue(raw) : String(raw)
 
   const displayDecimals = stepToDecimals(numberInputStep ?? step * numberInputScale)
   const displayForNumberInputRounded = Number((raw * numberInputScale).toFixed(displayDecimals))
 
-  const inputMin = min * numberInputScale
-  const inputMax = max * numberInputScale
   const inputStepResolved = numberInputStep ?? step * numberInputScale
 
-  const [inputText, setInputText] = useState<string>(String(displayForNumberInputRounded))
-  const [isEditing, setIsEditing] = useState(false)
+  // --- Draft string for the number input (commit on blur / Enter) ---
+  const [draft, setDraft] = useState<string>(String(displayForNumberInputRounded))
+  const [editing, setEditing] = useState(false)
 
   useEffect(() => {
-    if (!isEditing) {
-      setInputText(String(displayForNumberInputRounded))
+    if (!editing) {
+      setDraft(String(displayForNumberInputRounded))
     }
-  }, [displayForNumberInputRounded, isEditing])
+  }, [displayForNumberInputRounded, editing])
+
+  const commitDraft = useCallback(() => {
+    setEditing(false)
+    const trimmed = draft.trim()
+    if (trimmed === '' || !Number.isFinite(Number(trimmed))) return
+
+    let nextRaw = Number(trimmed) / numberInputScale
+    nextRaw = Math.min(max, Math.max(min, nextRaw))
+
+    const rawStep = inputStepResolved / numberInputScale
+    if (rawStep > 0) {
+      nextRaw = Math.round(nextRaw / rawStep) * rawStep
+    }
+
+    onChangeRaw(nextRaw)
+  }, [draft, numberInputScale, max, min, inputStepResolved, onChangeRaw])
+
+  // --- Slider local state (commit on pointerup) ---
+  const [sliderLocal, setSliderLocal] = useState(raw)
+  const dragging = useRef(false)
+
+  useEffect(() => {
+    if (!dragging.current) {
+      setSliderLocal(raw)
+    }
+  }, [raw])
+
+  const handleSliderPointerDown = useCallback(() => {
+    dragging.current = true
+  }, [])
+
+  const handleSliderChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = Number(e.target.value)
+    setSliderLocal(v)
+    if (!dragging.current) {
+      onChangeRaw(v)
+    }
+  }, [onChangeRaw])
+
+  const handleSliderPointerUp = useCallback(() => {
+    if (dragging.current) {
+      dragging.current = false
+      onChangeRaw(sliderLocal)
+    }
+  }, [onChangeRaw, sliderLocal])
 
   return (
     <div className={styles.item}>
@@ -70,40 +113,24 @@ function YearlySliderItem({
         min={min}
         max={max}
         step={step}
-        value={raw}
-        onChange={(e) => onChangeRaw(Number(e.target.value))}
+        value={dragging.current ? sliderLocal : raw}
+        onPointerDown={handleSliderPointerDown}
+        onChange={handleSliderChange}
+        onPointerUp={handleSliderPointerUp}
+        onPointerCancel={handleSliderPointerUp}
         aria-label={`${year} - ${label}`}
       />
 
       {showNumberInput ? (
         <input
           className={styles.numberInput}
-          type="number"
-          min={inputMin}
-          max={inputMax}
-          step={inputStepResolved}
-          value={inputText}
-          onFocus={() => setIsEditing(true)}
-          onBlur={() => setIsEditing(false)}
-          onChange={(e) => {
-            const nextText = e.target.value
-            setInputText(nextText)
-
-            if (nextText.trim() === '') return
-            const typedDisplay = Number(nextText)
-            if (!Number.isFinite(typedDisplay)) return
-
-            let nextRaw = typedDisplay / numberInputScale
-            nextRaw = Math.min(max, Math.max(min, nextRaw))
-
-            // Snap para o mesmo "step" do input numérico (em display units).
-            const rawStep = inputStepResolved / numberInputScale
-            if (rawStep > 0) {
-              nextRaw = Math.round(nextRaw / rawStep) * rawStep
-            }
-
-            onChangeRaw(nextRaw)
-          }}
+          type="text"
+          inputMode="decimal"
+          value={editing ? draft : String(displayForNumberInputRounded)}
+          onFocus={() => setEditing(true)}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commitDraft}
+          onKeyDown={(e) => { if (e.key === 'Enter') commitDraft() }}
           aria-label={`${year} - ${label} manual`}
         />
       ) : null}
@@ -142,11 +169,13 @@ export function YearlySliderGrid({
   numberInputScale = 1,
   numberInputStep,
 }: YearlySliderGridProps) {
+  const { projectedYears } = useYearConfig()
+  const years = projectedYears.map((y) => String(y) as YearKey)
   return (
     <div className={styles.container}>
       {hint ? <p className={styles.hint}>{hint}</p> : null}
       <div className={styles.grid}>
-        {YEARS.map((year) => {
+        {years.map((year) => {
           const raw = values[year] ?? 0
           return (
             <YearlySliderItem

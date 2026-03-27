@@ -1,8 +1,8 @@
 import type { FluxoRow } from '../../types'
 import { fmtBRL } from '../../utils/formatters'
-import { YEARS } from '../../utils/constants'
 import { Table } from '../ui/Table'
 import styles from './CashFlowSection.module.css'
+import { useYearConfig } from '../../contexts/YearConfigContext'
 
 interface CashFlowSectionProps {
   fluxo: FluxoRow[]
@@ -26,6 +26,7 @@ const FLUXO_LINES = [
 ]
 
 export function CashFlowSection({ fluxo }: CashFlowSectionProps) {
+  const { projectedYears } = useYearConfig()
   const tableData: TableRow[] = FLUXO_LINES.map(({ key, label }) => {
     const row: TableRow = { linha: label }
 
@@ -45,9 +46,9 @@ export function CashFlowSection({ fluxo }: CashFlowSectionProps) {
       align: 'left' as const,
       width: '180px',
     },
-    ...YEARS.map((year) => ({
-      key: year,
-      header: year,
+    ...projectedYears.map((year) => ({
+      key: String(year),
+      header: String(year),
       align: 'right' as const,
     })),
   ]

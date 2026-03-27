@@ -5,17 +5,20 @@ Orquestra BP → NCGL → Fluxo → DCF → sensibilidade.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 
-from .bp import carregar_consolidado_csv, montar_bp, total_func_operacional_com_2025
-from .constants import ANOS_PROJECAO, G_PERPETUIDADE, WACC_FIXO
+from .bp import carregar_consolidado_csv, montar_bp, total_func_operacional_com_historico
+from .constants import G_PERPETUIDADE, WACC_FIXO
 from .dcf_valuation import montar_tabela_dcf
 from .fluxo import carregar_ams_csv, montar_fluxo
 from .ncgl import montar_ncgl
 from .sensitivity import cenarios_gabarito, matriz_wacc_g
 from .wacc import beta_ponderado_por_ano, carregar_faturamentos_bu, faturamentos_bu_de_dfs, wacc_a_partir_de_beta
+
+if TYPE_CHECKING:
+    from ..context import SimulationContext
 
 
 def run_dcf_pipeline_from_frames(
@@ -23,6 +26,7 @@ def run_dcf_pipeline_from_frames(
     df_ams: pd.DataFrame,
     dfs_bu: dict[str, pd.DataFrame] | None = None,
     *,
+    ctx: SimulationContext,
     wacc: float | None = None,
     g: float | None = None,
     base_dir: Path | None = None,
@@ -35,23 +39,25 @@ def run_dcf_pipeline_from_frames(
     if base_dir is None:
         base_dir = Path(__file__).resolve().parent.parent
 
-    total_func = total_func_operacional_com_2025()
+    anos_proj = ctx.year_config.projected_years
+    total_func = total_func_operacional_com_historico(ctx)
     w = WACC_FIXO if wacc is None else wacc
     g_ = G_PERPETUIDADE if g is None else g
 
-    df_bp = montar_bp(df_consolidado, total_func, usar_custos_excl_gabarito=True)
-    df_ncgl = montar_ncgl(df_bp)
-    df_fluxo = montar_fluxo(df_consolidado, df_bp, df_ncgl, df_ams)
-    resultado_dcf = montar_tabela_dcf(df_fluxo, df_consolidado, wacc=w, g=g_)
+    df_bp = montar_bp(df_consolidado, total_func, ctx, usar_custos_excl_gabarito=True)
+    df_ncgl = montar_ncgl(df_bp, ctx)
+    df_fluxo = montar_fluxo(df_consolidado, df_bp, df_ncgl, df_ams, ctx)
+    resultado_dcf = montar_tabela_dcf(df_fluxo, df_consolidado, ctx, wacc=w, g=g_)
 
-    fcff_list = [float(df_fluxo[df_fluxo["ano"] == a]["fcff"].iloc[0]) for a in ANOS_PROJECAO]
-    df_sens_mat = matriz_wacc_g(fcff_list)
-    df_cenarios = cenarios_gabarito(fcff_list)
+    fcff_list = [float(df_fluxo[df_fluxo["ano"] == a]["fcff"].iloc[0]) for a in anos_proj]
+    caixa_ref = ctx.base_values.caixa_base
+    df_sens_mat = matriz_wacc_g(fcff_list, caixa=caixa_ref)
+    df_cenarios = cenarios_gabarito(fcff_list, caixa=caixa_ref)
 
     if dfs_bu:
-        fat = faturamentos_bu_de_dfs(dfs_bu, ANOS_PROJECAO)
+        fat = faturamentos_bu_de_dfs(dfs_bu, anos_proj)
     else:
-        fat = carregar_faturamentos_bu(base_dir, ANOS_PROJECAO)
+        fat = carregar_faturamentos_bu(base_dir, anos_proj)
     betas_ano = beta_ponderado_por_ano(fat)
 
     out: dict[str, Any] = {
@@ -61,7 +67,7 @@ def run_dcf_pipeline_from_frames(
         "dcf": resultado_dcf,
         "wacc_fixo": w,
         "beta_ponderado_por_ano": betas_ano,
-        "wacc_dinamico_por_ano": {a: wacc_a_partir_de_beta(betas_ano[a]) for a in ANOS_PROJECAO},
+        "wacc_dinamico_por_ano": {a: wacc_a_partir_de_beta(betas_ano[a]) for a in anos_proj},
         "matriz_sensibilidade": df_sens_mat,
         "cenarios": df_cenarios,
     }
@@ -101,16 +107,20 @@ def run_dcf_pipeline(
     """
     Executa a cadeia completa lendo CSVs e opcionalmente grava CSVs em ``base_dir/dcf_output/``.
     """
+    from ..context import default_simulation_context
+
     if base_dir is None:
         base_dir = Path(__file__).resolve().parent.parent
 
     df_cons = carregar_consolidado_csv(base_dir)
     df_ams = carregar_ams_csv(base_dir)
+    ctx = default_simulation_context()
     return run_dcf_pipeline_from_frames(
         df_cons,
         df_ams,
         wacc=None,
         g=None,
+        ctx=ctx,
         base_dir=base_dir,
         salvar_csv=salvar_csv,
         out_subdir=out_subdir,

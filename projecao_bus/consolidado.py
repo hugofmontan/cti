@@ -2,26 +2,19 @@
 Projecao DRE Consolidada (2026-2030).
 """
 
+from __future__ import annotations
+
 from pathlib import Path
 from typing import Iterable
 
 import pandas as pd
 
-from .shared import _validar_anos, salvar_projecao_csv
-
+from .context import SimulationContext, default_simulation_context
+from .shared import salvar_projecao_csv, sort_years_non_empty
 CHAVES_BU_OPERACIONAIS = ("fopm", "renovacao", "ams", "venda_sw", "data_science")
+# Consolidado da planilha inclui também a BU Administrativa (rateio interno deve "fechar").
+CHAVES_BU_CONSOLIDADO = CHAVES_BU_OPERACIONAIS + ("administrativa",)
 
-ANOS_PADRAO = (2026, 2027, 2028, 2029, 2030)
-
-SELIC_FOCUS = {
-    2026: 0.1213,
-    2027: 0.1050,
-    2028: 0.1000,
-    2029: 0.0950,
-    2030: 0.1000,
-}
-
-CAIXA_BASE_2025 = 8_018_000.0
 SPREAD_RENDIMENTO_CAIXA = 0.95
 DESPESA_FINANCEIRA_FIXA = 95_333.33
 RATIO_PARTICIPACOES = 0.047806
@@ -46,7 +39,7 @@ def _carregar_projecoes_operacionais(base_dir: Path) -> dict[str, pd.DataFrame]:
 def _normalizar_dfs_operacionais(dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     """Garante índice por ano e chaves esperadas."""
     out: dict[str, pd.DataFrame] = {}
-    for k in CHAVES_BU_OPERACIONAIS:
+    for k in CHAVES_BU_CONSOLIDADO:
         if k not in dfs:
             raise ValueError(f"DataFrame operacional ausente: {k}")
         df = dfs[k]
@@ -58,20 +51,23 @@ def _normalizar_dfs_operacionais(dfs: dict[str, pd.DataFrame]) -> dict[str, pd.D
 
 def projetar_dre_consolidado_de_dfs(
     dfs: dict[str, pd.DataFrame],
-    anos: Iterable[int] = ANOS_PADRAO,
+    ctx: SimulationContext | None = None,
+    anos: Iterable[int] | None = None,
 ) -> pd.DataFrame:
     """
     Consolida a partir de DataFrames já calculados (sem ler CSVs).
     Chaves: fopm, renovacao, ams, venda_sw, data_science.
     """
-    anos_list = _validar_anos(anos)
+    ctx = ctx if ctx is not None else default_simulation_context()
+    anos_list = sort_years_non_empty(anos or ctx.year_config.projected_years)
     dfs_i = _normalizar_dfs_operacionais(dfs)
-    return _projetar_consolidado_core(dfs_i, anos_list)
+    return _projetar_consolidado_core(dfs_i, anos_list, ctx)
 
 
 def _projetar_consolidado_core(
     dfs: dict[str, pd.DataFrame],
     anos_list: list[int],
+    ctx: SimulationContext,
 ) -> pd.DataFrame:
     """
     D&A consolidada = D&A total do BP (cascata CAPEX × 20% por safra).
@@ -83,7 +79,7 @@ def _projetar_consolidado_core(
     Participações são apenas linha de DRE (não entram nesse saldo de caixa).
     """
     from .dcf.bp import montar_bp
-    from .dcf.constants import PAYOUT_DIVIDENDOS
+    from .dcf.constants import MESES_RESERVA_CAIXA
     from .dcf.ncgl import montar_ncgl
     from .rateio_administrativo import total_func_operacional_de_dfs
 
@@ -96,26 +92,37 @@ def _projetar_consolidado_core(
         2025: 2_508_000.0,
     }
     honorarios_cfp_por_ano: dict[int, float] = dict(honorarios_cfp_hist)
-    for ano in anos_list:
-        honorarios_cfp_por_ano[ano] = (
-            honorarios_cfp_por_ano[ano - 3] + honorarios_cfp_por_ano[ano - 2] + honorarios_cfp_por_ano[ano - 1]
+    # Média móvel de 3 anos: Honorários(t) = média(t-3,t-2,t-1). Precisamos preencher
+    # todos os anos até max(anos_list), senão quando a projeção começa em 2027+ (ex.:
+    # histórico termina em 2026) falta a entrada intermediária de 2026 e dá KeyError.
+    y_hi = max(anos_list)
+    y_next = max(honorarios_cfp_por_ano.keys()) + 1
+    while y_next <= y_hi:
+        honorarios_cfp_por_ano[y_next] = (
+            honorarios_cfp_por_ano[y_next - 3]
+            + honorarios_cfp_por_ano[y_next - 2]
+            + honorarios_cfp_por_ano[y_next - 1]
         ) / 3.0
+        y_next += 1
 
     # 1) Linhas operacionais + DataFrame de entrada do BP (mesmas colunas que `montar_bp` usa)
     linhas_pre: list[dict[str, float | int]] = []
+    selic_map = ctx.selic_focus
+    _selic_last_year = max(selic_map.keys())
+    _selic_last_val = selic_map[_selic_last_year]
     for ano in anos_list:
-        receita_bruta = sum(float(dfs[k].at[ano, "faturamento_bruto"]) for k in CHAVES_BU_OPERACIONAIS)
-        deducoes = sum(float(dfs[k].at[ano, "impostos_sv"]) for k in CHAVES_BU_OPERACIONAIS)
-        receita_liquida = sum(float(dfs[k].at[ano, "receita_liquida"]) for k in CHAVES_BU_OPERACIONAIS)
-        incentivos = sum(float(dfs[k].at[ano, "incentivos"]) for k in CHAVES_BU_OPERACIONAIS)
-        gastos_pessoal = sum(float(dfs[k].at[ano, "gastos_pessoal"]) for k in CHAVES_BU_OPERACIONAIS)
-        outras_desp_diretas = sum(float(dfs[k].at[ano, "outras_desp_diretas"]) for k in CHAVES_BU_OPERACIONAIS)
-        mc1 = sum(float(dfs[k].at[ano, "mc1"]) for k in CHAVES_BU_OPERACIONAIS)
-        remuneracao_socios = sum(float(dfs[k].at[ano, "remuneracao_socios"]) for k in CHAVES_BU_OPERACIONAIS)
-        mc2 = sum(float(dfs[k].at[ano, "mc2"]) for k in CHAVES_BU_OPERACIONAIS)
-        outras_desp_adm = sum(float(dfs[k].at[ano, "outras_desp_adm"]) for k in CHAVES_BU_OPERACIONAIS)
+        receita_bruta = sum(float(dfs[k].at[ano, "faturamento_bruto"]) for k in CHAVES_BU_CONSOLIDADO)
+        deducoes = sum(float(dfs[k].at[ano, "impostos_sv"]) for k in CHAVES_BU_CONSOLIDADO)
+        receita_liquida = sum(float(dfs[k].at[ano, "receita_liquida"]) for k in CHAVES_BU_CONSOLIDADO)
+        incentivos = sum(float(dfs[k].at[ano, "incentivos"]) for k in CHAVES_BU_CONSOLIDADO)
+        gastos_pessoal = sum(float(dfs[k].at[ano, "gastos_pessoal"]) for k in CHAVES_BU_CONSOLIDADO)
+        outras_desp_diretas = sum(float(dfs[k].at[ano, "outras_desp_diretas"]) for k in CHAVES_BU_CONSOLIDADO)
+        mc1 = sum(float(dfs[k].at[ano, "mc1"]) for k in CHAVES_BU_CONSOLIDADO)
+        remuneracao_socios = sum(float(dfs[k].at[ano, "remuneracao_socios"]) for k in CHAVES_BU_CONSOLIDADO)
+        mc2 = sum(float(dfs[k].at[ano, "mc2"]) for k in CHAVES_BU_CONSOLIDADO)
+        outras_desp_adm = sum(float(dfs[k].at[ano, "outras_desp_adm"]) for k in CHAVES_BU_CONSOLIDADO)
         honorarios_adm = float(honorarios_cfp_por_ano[ano])
-        ebitda = sum(float(dfs[k].at[ano, "ebitda"]) for k in CHAVES_BU_OPERACIONAIS)
+        ebitda = sum(float(dfs[k].at[ano, "ebitda"]) for k in CHAVES_BU_CONSOLIDADO)
         linhas_pre.append(
             {
                 "ano": ano,
@@ -136,14 +143,14 @@ def _projetar_consolidado_core(
 
     df_bp_in = pd.DataFrame(linhas_pre)
     total_func = total_func_operacional_de_dfs(dfs, anos_list)
-    df_bp = montar_bp(df_bp_in, total_func, usar_custos_excl_gabarito=True)
+    df_bp = montar_bp(df_bp_in, total_func, ctx, usar_custos_excl_gabarito=True)
     da_por_ano = df_bp.set_index("ano")["da_total"].to_dict()
     capex_por_ano = df_bp.set_index("ano")["capex"].to_dict()
-    df_ncgl = montar_ncgl(df_bp)
+    df_ncgl = montar_ncgl(df_bp, ctx)
     delta_ncg_por_ano = df_ncgl.set_index("ano")["delta_ncg"].to_dict()
 
     resultados: list[dict] = []
-    caixa_ant = CAIXA_BASE_2025
+    caixa_ant = ctx.base_values.caixa_base
 
     for row in linhas_pre:
         ano = int(row["ano"])
@@ -151,19 +158,20 @@ def _projetar_consolidado_core(
         ebitda = float(row["ebitda"])
 
         # CONS.FORMATO PARCEIRO linha 40:
-        # DA_CFP = (-BP!G93) - DRE_AMS!J45 = DA_nova_BP - DA_AMS
-        # Mantemos aqui a mesma convenção de sinal da planilha (valor pode ficar negativo).
+        # D&A consolidada para DRE = D&A_presumido_bp + D&A_ams (valor positivo),
+        # sem dupla contagem. No motor atual, `da_nova_bp` já reflete o total
+        # consolidado da cascata, então usamos esse total diretamente.
         da_nova_bp = float(da_por_ano[ano])
-        da_ams = float(dfs["ams"].at[ano, "depreciacao_amort"])
-        da_consolidada = da_nova_bp - da_ams
+        da_consolidada = da_nova_bp
         ebit = ebitda - da_consolidada
 
-        receita_financeira = caixa_ant * (SELIC_FOCUS[ano] * SPREAD_RENDIMENTO_CAIXA)
+        selic = selic_map.get(int(ano), _selic_last_val)
+        receita_financeira = caixa_ant * (selic * SPREAD_RENDIMENTO_CAIXA)
         despesa_financeira = DESPESA_FINANCEIRA_FIXA
         lair = ebit + receita_financeira - despesa_financeira
 
         # IRPJ/CSLL por BU (somente AMS tem valor > 0 no modelo).
-        irpj_csll = sum(float(dfs[k].at[ano, "irpj_csll"]) for k in CHAVES_BU_OPERACIONAIS)
+        irpj_csll = sum(float(dfs[k].at[ano, "irpj_csll"]) for k in CHAVES_BU_CONSOLIDADO if "irpj_csll" in dfs[k].columns)
         lucro_liquido = lair - irpj_csll
         participacoes = lucro_liquido * RATIO_PARTICIPACOES
 
@@ -172,8 +180,28 @@ def _projetar_consolidado_core(
         capex = float(capex_por_ano[ano])
         dncg = float(delta_ncg_por_ano[ano])
         fcff = nopat + da_consolidada - capex - dncg
-        dividendos = lucro_liquido * PAYOUT_DIVIDENDOS
-        caixa = caixa_ant + fcff - dividendos
+        # Política do modelo Excel:
+        # FLUXO!B20 = (CONSOLIDADO!K11 + CONSOLIDADO!K18) * 4/12
+        # K11 = incentivos + gastos_pessoal + outras_desp_diretas
+        # K18 = remuneracao_socios + outras_desp_adm + rateio_adm + honorarios_adm + incentivos
+        # Observação: incentivos entra duas vezes (K11 e K18), conforme planilha.
+        k11 = (
+            float(row["incentivos"])
+            + float(row["gastos_pessoal"])
+            + float(row["outras_desp_diretas"])
+        )
+        k18 = (
+            float(row["remuneracao_socios"])
+            + float(row["outras_desp_adm"])
+            + float(row.get("rateio_adm", 0.0))
+            + float(row["honorarios_adm"])
+            + float(row["incentivos"])
+        )
+        custos_despesas_totais = k11 + k18
+        caixa_minimo = custos_despesas_totais * (MESES_RESERVA_CAIXA / 12.0)
+        caixa_antes_dividendos = caixa_ant + fcff
+        dividendos = max(caixa_antes_dividendos - caixa_minimo, 0.0)
+        caixa = caixa_antes_dividendos - dividendos
 
         mc1 = float(row["mc1"])
         mc2 = float(row["mc2"])
@@ -215,10 +243,12 @@ def _projetar_consolidado_core(
 
 
 def projetar_dre_consolidado(
-    anos: Iterable[int] = ANOS_PADRAO,
+    ctx: SimulationContext | None = None,
+    anos: Iterable[int] | None = None,
     base_dir: Path | None = None,
 ) -> pd.DataFrame:
-    anos_list = _validar_anos(anos)
+    ctx = ctx if ctx is not None else default_simulation_context()
+    anos_list = sort_years_non_empty(anos or ctx.year_config.projected_years)
     if base_dir is None:
         base_dir = Path(__file__).resolve().parent
 
@@ -226,14 +256,15 @@ def projetar_dre_consolidado(
     for k in dfs:
         dfs[k] = dfs[k].set_index("ano")
 
-    return _projetar_consolidado_core(dfs, anos_list)
+    return _projetar_consolidado_core(dfs, anos_list, ctx)
 
 
 def projetar_e_salvar_consolidado(
-    anos: Iterable[int] = ANOS_PADRAO,
+    ctx: SimulationContext | None = None,
+    anos: Iterable[int] | None = None,
     base_dir: Path | None = None,
 ):
-    df = projetar_dre_consolidado(anos=anos, base_dir=base_dir)
+    df = projetar_dre_consolidado(ctx=ctx, anos=anos, base_dir=base_dir)
     return salvar_projecao_csv(df, base_dir=base_dir, nome_arquivo="projecao_consolidado.csv")
 
 

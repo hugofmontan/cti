@@ -1,4 +1,5 @@
 export { YearlyInputGrid } from './YearlyInputGrid'
+export { PremissasMacro } from './PremissasMacro'
 export { PremissasFOPM } from './PremissasFOPM'
 export { PremissasRenovacao } from './PremissasRenovacao'
 export { PremissasAMS } from './PremissasAMS'

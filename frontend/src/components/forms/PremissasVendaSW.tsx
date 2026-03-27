@@ -1,6 +1,6 @@
 import type { Premissas } from '../../types'
 import { Panel } from '../ui/Panel'
-import { Input } from '../ui/Input'
+import { PercentInput } from '../ui/PercentInput'
 
 interface PremissasVendaSWProps {
   premissas: Premissas
@@ -13,12 +13,11 @@ export function PremissasVendaSW({
 }: PremissasVendaSWProps) {
   return (
     <Panel title="Venda de Softwares - Crescimento Real" defaultOpen={false}>
-      <Input
+      <PercentInput
         label="Fator Crescimento Real (%)"
-        type="number"
+        rawValue={premissas.venda_softwares.fator_crescimento_real}
+        onChange={onFatorChange}
         step={0.5}
-        value={Number((premissas.venda_softwares.fator_crescimento_real * 100).toFixed(2))}
-        onChange={(e) => onFatorChange(Number(e.target.value) / 100)}
         hint="Ex: 4.50 = 4.50% real + inflacao"
       />
     </Panel>

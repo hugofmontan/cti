@@ -10,6 +10,44 @@ export function fmtBRL(value: number): string {
 }
 
 /**
+ * Accounting style BRL formatter:
+ * - negatives in parentheses
+ * - optional dash for zero
+ */
+export function fmtBRLAccounting(
+  value: number,
+  opts: { zeroAsDash?: boolean } = {},
+): string {
+  if (!Number.isFinite(value)) return '—'
+  const { zeroAsDash = false } = opts
+  if (zeroAsDash && Math.abs(value) < 0.5) return '—'
+
+  if (value < 0) {
+    return `(${fmtBRL(Math.abs(value))})`
+  }
+  return fmtBRL(value)
+}
+
+/**
+ * Accounting style formatter in BRL thousands (R$ mil):
+ * - 12_345_678 -> "12.346"
+ * - negatives in parentheses
+ * - optional dash for zero
+ */
+export function fmtBRLThousandsAccounting(
+  value: number,
+  opts: { zeroAsDash?: boolean; decimals?: number } = {},
+): string {
+  if (!Number.isFinite(value)) return '—'
+  const { zeroAsDash = false, decimals = 0 } = opts
+  if (zeroAsDash && Math.abs(value) < 0.5) return '—'
+
+  const thousands = Math.abs(value) / 1_000
+  const formatted = fmtNumber(thousands, decimals)
+  return value < 0 ? `(${formatted})` : formatted
+}
+
+/**
  * Format number as Brazilian Real with decimal places
  */
 export function fmtBRLFull(value: number, decimals = 2): string {

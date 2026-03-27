@@ -7,6 +7,35 @@ interface UsePremissasArgs {
 }
 
 export function usePremissas({ premissas, setPremissas }: UsePremissasArgs) {
+  // Macro setters
+  const setInflacaoFocus = useCallback((year: YearKey, value: number) => {
+    setPremissas((prev) =>
+      prev
+        ? {
+            ...prev,
+            inflacao_focus_por_ano: {
+              ...prev.inflacao_focus_por_ano,
+              [year]: value,
+            },
+          }
+        : prev
+    )
+  }, [])
+
+  const setSelicFocus = useCallback((year: YearKey, value: number) => {
+    setPremissas((prev) =>
+      prev
+        ? {
+            ...prev,
+            selic_focus_por_ano: {
+              ...prev.selic_focus_por_ano,
+              [year]: value,
+            },
+          }
+        : prev
+    )
+  }, [])
+
 
   // FOPM setters
   const setFopmHeadcount = useCallback((year: YearKey, value: number) => {
@@ -154,6 +183,9 @@ export function usePremissas({ premissas, setPremissas }: UsePremissasArgs) {
 
   return {
     premissas,
+    // Macro
+    setInflacaoFocus,
+    setSelicFocus,
     // FOPM
     setFopmHeadcount,
     setFopmOciosidade,

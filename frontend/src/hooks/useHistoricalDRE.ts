@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { DRERow } from '../types'
+import type { BPRow, DRERow } from '../types'
 import { API_BASE_URL } from '../utils/constants'
 
 /** Série 2018–2030: headcounts por BU e pool histórico (rateio) — `data/historico/headcount_funcionarios_bu.csv`. */
@@ -16,10 +16,13 @@ export interface HeadcountOperacionalRow {
 export interface HistoricalDREBundle {
   consolidado: DRERow[]
   dre: Record<string, DRERow[]>
+  bp?: BPRow[]
   headcount_operacional_bu?: HeadcountOperacionalRow[]
   historical_year_start: number
   historical_year_end: number
   projected_year_start: number
+  projected_years?: number[]
+  projected_year_end?: number
 }
 
 interface UseHistoricalDREReturn {

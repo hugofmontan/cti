@@ -6,7 +6,8 @@ API_PORT ?= 8000
 .PHONY: install dev test lint clean
 
 install:
-	$(PIP) install -e ".[api,dev]"
+	$(PIP) install -r requirements-dev.txt
+	$(PIP) install -e . --no-deps
 	cd frontend && npm install
 
 dev:

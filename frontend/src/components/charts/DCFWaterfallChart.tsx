@@ -10,9 +10,10 @@ import {
 } from 'recharts'
 import type { SimulateResponse } from '../../types'
 import { fmtBRL, fmtMillions, fmtPct } from '../../utils/formatters'
-import { CHART_COLORS, YEARS } from '../../utils/constants'
+import { CHART_COLORS } from '../../utils/constants'
 import { ChartContainer } from './ChartContainer'
 import styles from './DCFWaterfallChart.module.css'
+import { useYearConfig } from '../../contexts/YearConfigContext'
 
 interface DCFWaterfallChartProps {
   dcf: SimulateResponse['dcf']
@@ -27,6 +28,8 @@ interface WaterfallPoint {
 }
 
 export function DCFWaterfallChart({ dcf }: DCFWaterfallChartProps) {
+  const { projectedYears } = useYearConfig()
+
   const vpFluxos = dcf.soma_vp_fcffs
   const vpTerminal = dcf.enterprise_value - dcf.soma_vp_fcffs
   const ev = dcf.enterprise_value
@@ -37,8 +40,9 @@ export function DCFWaterfallChart({ dcf }: DCFWaterfallChartProps) {
   let acumulado = 0
 
   // VP FCFFs (degraus positivos)
-  for (const year of YEARS) {
-    const vpFcff = dcf.vp_fcff_por_ano[year] || 0
+  for (const year of projectedYears) {
+    const yearKey = String(year)
+    const vpFcff = dcf.vp_fcff_por_ano[yearKey] || 0
     data.push({
       name: `VP ${year}`,
       offset: acumulado,

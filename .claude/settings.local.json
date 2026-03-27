@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(find:*)",
-      "Bash(grep -E '\\\\.\\(py|js|json|md|csv|yaml|yml|txt\\)$')"
-    ]
-  }
-}

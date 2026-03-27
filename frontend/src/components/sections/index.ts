@@ -1,5 +1,7 @@
 export { ValuationSummary } from './ValuationSummary'
 export { ConsolidatedDRE } from './ConsolidatedDRE'
+export { BalanceSheetSection } from './BalanceSheetSection'
 export { CashFlowSection } from './CashFlowSection'
 export { MultiplesSection } from './MultiplesSection'
 export { BUBreakdown } from './BUBreakdown'
+export { UploadHistoricalPanel } from './UploadHistoricalPanel'

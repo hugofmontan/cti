@@ -1,4 +1,5 @@
 export { ChartContainer } from './ChartContainer'
+export { BuOperationalCharts } from './BuOperationalCharts'
 export { FCFFBarChart } from './FCFFBarChart'
 export { RevenueByBUChart } from './RevenueByBUChart'
 export { RevenueByBUPctChart } from './RevenueByBUPctChart'
